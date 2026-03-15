@@ -1,0 +1,5 @@
+{
+  "name": "Nexus Garage",
+  "description": "SaaS para talleres mecánicos con tablero Kanban, KPIs de tiempo de reparación y gestión de vehículos por patente.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,275 @@
+import React, { useState, useEffect } from 'react';
+import { Layout } from './components/Layout';
+import { KanbanBoard } from './components/KanbanBoard';
+import { AddTicketModal } from './components/AddTicketModal';
+import { Login } from './components/Login';
+import { CustomerPortal } from './components/CustomerPortal';
+import { Inventory } from './components/Inventory';
+import { Customers } from './components/Customers';
+import { useGarageStore } from './hooks/useGarageStore';
+import { useAuth } from './hooks/useAuth';
+import { UsersAdmin } from './components/UsersAdmin';
+import { Ticket, Reminder, TicketStatus } from './types';
+
+import { Mechanics } from './components/Mechanics';
+import { AddMechanicModal } from './components/AddMechanicModal';
+import { EditTicketModal } from './components/EditTicketModal';
+import { SettingsForm } from './components/SettingsForm';
+import { Agenda } from './components/Agenda';
+import { PublicBookingModal } from './components/PublicBookingModal';
+import { LandingPage } from './components/LandingPage';
+
+type ViewState = 'landing' | 'login' | 'customer' | 'dashboard';
+
+export default function App() {
+  const [view, setView] = useState<ViewState>('landing');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddMechanicModalOpen, setIsAddMechanicModalOpen] = useState(false);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [publicBranding, setPublicBranding] = useState<any>(null);
+  const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
+  const [searchedPatente, setSearchedPatente] = useState<string | null>(null);
+  const [currentCustomerTicket, setCurrentCustomerTicket] = useState<Ticket | null>(null);
+
+  const { isSuperAdmin, profile } = useAuth();
+
+  const {
+    // Garage operations
+    tickets, mechanics, parts, customers, settings, loading, reminders, notifications,
+    addTicket, updateTicketStatus, updateTicket, searchTicket,
+    addPart, updatePart,
+    addCustomer, updateCustomer, deleteCustomer,
+    updateVehicle, deleteVehicle,
+    updateSettings,
+    addMechanic, deleteMechanic,
+    acceptQuotation, markNotificationAsRead,
+    clearFinishedTickets, deleteTicket,
+    fetchCompanies, addPublicReminder, fetchPublicSettingsBySlug, fetchOccupiedReminders, fetchPublicVehicleInfo,
+    addReminder, deleteReminder, updateReminder
+  } = useGarageStore(profile?.company_id);
+
+  useEffect(() => {
+    // Detect public branding from URL slug (?t=slug)
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('t') || 'roma-spa';
+    if (slug) {
+      fetchPublicSettingsBySlug(slug).then(data => {
+        setPublicBranding(data || {
+          theme_menu_highlight: '#D6A621',
+          theme_menu_text: '#a1a1aa',
+          workshop_name: 'Roma Center SPA'
+        });
+      }).catch(err => {
+        console.error('Error fetching public branding:', err);
+        setPublicBranding({
+          theme_menu_highlight: '#D6A621',
+          theme_menu_text: '#a1a1aa',
+          workshop_name: 'Roma Center SPA'
+        });
+      });
+    }
+  }, [fetchPublicSettingsBySlug]);
+
+  const handleEditTicket = (ticket: Ticket) => {
+    setEditingTicket(ticket);
+    setIsEditModalOpen(true);
+  };
+
+  const handleLogin = () => {
+    setView('dashboard');
+  };
+
+  const handleCustomerSearch = async (patente: string) => {
+    const ticket = await searchTicket(patente);
+    if (ticket) {
+      setSearchedPatente(patente);
+      setCurrentCustomerTicket(ticket);
+      setView('customer');
+    } else {
+      alert('No se encontró un vehículo con esa patente.');
+    }
+  };
+
+  const handleBackToLogin = () => {
+    setView('landing');
+    setSearchedPatente(null);
+    setCurrentCustomerTicket(null);
+    setActiveTab('dashboard');
+  };
+
+  const handlePromoteReminder = async (reminder: Reminder, targetStatus: TicketStatus) => {
+    try {
+      await addTicket({
+        id: reminder.patente,
+        model: reminder.vehicle_model,
+        owner_name: reminder.customer_name,
+        owner_phone: reminder.customer_phone,
+        status: targetStatus,
+        notes: `Cita Programada: ${reminder.reminder_type}. Agendada para ${new Date(reminder.planned_date).toLocaleString()}`
+      });
+      await updateReminder(reminder.id, { completed: true });
+    } catch (err) {
+      console.error('Error promoting reminder to ticket:', err);
+      alert('Error al convertir la cita en ticket activo.');
+    }
+  };
+
+  if (view === 'landing') {
+    return (
+      <LandingPage 
+        onPortalAccess={() => setView('login')}
+        onAdminAccess={handleLogin}
+        onCustomerSearch={handleCustomerSearch}
+        fetchCompanies={fetchCompanies}
+        onAddReminder={addPublicReminder}
+        fetchOccupied={fetchOccupiedReminders}
+        fetchVehicleInfo={fetchPublicVehicleInfo}
+        branding={publicBranding}
+      />
+    );
+  }
+
+  if (view === 'login') {
+    return (
+      <>
+        <Login 
+          onLogin={handleLogin} 
+          onCustomerSearch={handleCustomerSearch} 
+          onOpenBooking={() => setIsBookingModalOpen(true)}
+          branding={publicBranding}
+        />
+        <PublicBookingModal
+          isOpen={isBookingModalOpen}
+          onClose={() => setIsBookingModalOpen(false)}
+          fetchCompanies={fetchCompanies}
+          onAddReminder={addPublicReminder}
+          fetchOccupied={fetchOccupiedReminders}
+          fetchVehicleInfo={fetchPublicVehicleInfo}
+          branding={publicBranding}
+        />
+      </>
+    );
+  }
+
+  if (view === 'customer') {
+    return (
+      <CustomerPortal
+        ticket={currentCustomerTicket}
+        settings={settings}
+        onBack={handleBackToLogin}
+        onAcceptQuotation={acceptQuotation}
+      />
+    );
+  }
+
+  return (
+    <Layout
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      onLogout={handleBackToLogin}
+      notifications={notifications}
+      markAsRead={markNotificationAsRead}
+      settings={settings}
+      isSuperAdmin={isSuperAdmin}
+      branding={publicBranding}
+    >
+      {activeTab === 'dashboard' && (
+        <KanbanBoard
+          tickets={tickets}
+          mechanics={mechanics}
+          reminders={reminders}
+          settings={settings}
+          onUpdateStatus={updateTicketStatus}
+          onEditTicket={handleEditTicket}
+          onAddTicket={() => setIsAddModalOpen(true)}
+          onClearFinished={clearFinishedTickets}
+          onUpdateNotes={async (id, notes) => {
+            await updateTicket(id, { vehicle_notes: notes });
+          }}
+          onPromoteReminder={handlePromoteReminder}
+        />
+      )}
+
+
+      {activeTab === 'inventory' && (
+        <Inventory parts={parts} settings={settings} onAddPart={addPart} onUpdatePart={updatePart} />
+      )}
+
+      {activeTab === 'agenda' && (
+        <Agenda 
+          tickets={tickets} 
+          mechanics={mechanics} 
+          customers={customers} 
+          reminders={reminders}
+          settings={settings}
+          addReminder={addReminder}
+          updateReminder={updateReminder}
+          deleteReminder={deleteReminder}
+        />
+      )}
+
+      {activeTab === 'customers' && (
+        <Customers
+          customers={customers}
+          tickets={tickets}
+          settings={settings}
+          onAddCustomer={addCustomer}
+          onUpdateVehicle={updateVehicle}
+          deleteVehicle={deleteVehicle}
+          onUpdateNotes={async (id, notes) => {
+            await updateTicket(id, { vehicle_notes: notes });
+          }}
+          searchTicket={searchTicket}
+        />
+      )}
+
+      {activeTab === 'mechanics' && (
+        <Mechanics
+          mechanics={mechanics}
+          tickets={tickets}
+          onAdd={() => setIsAddMechanicModalOpen(true)}
+          onDelete={deleteMechanic}
+          onUpdateTicket={updateTicket}
+        />
+      )}
+
+      {activeTab === 'settings' && (
+        <div className="p-8">
+          <SettingsForm settings={settings} onUpdate={updateSettings} />
+        </div>
+      )}
+
+      {activeTab === 'users' && isSuperAdmin && (
+        <div className="p-8">
+          <UsersAdmin />
+        </div>
+      )}
+
+      <AddTicketModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={addTicket}
+        mechanics={mechanics}
+        customers={customers}
+        tickets={tickets}
+        settings={settings}
+      />
+
+      <AddMechanicModal
+        isOpen={isAddMechanicModalOpen}
+        onClose={() => setIsAddMechanicModalOpen(false)}
+        onAdd={addMechanic}
+      />
+      <EditTicketModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        ticket={editingTicket}
+        mechanics={mechanics}
+        parts={parts}
+        onUpdate={updateTicket}
+      />
+    </Layout>
+  );
+}
