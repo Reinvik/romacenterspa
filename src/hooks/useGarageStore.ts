@@ -660,7 +660,7 @@ export function useGarageStore(companyId?: string) {
       await updateTicket(id, {
         quotation_accepted: true
       });
-      await updateTicketStatus(id, 'En Reparación', 'Gestión de Cotización (Auto)');
+      await updateTicketStatus(id, 'En Mantención', 'Gestión de Cotización (Auto)');
       // Insert notification
       await supabaseGarage.from('garage_notifications').insert([{
         ticket_id: id,
@@ -668,65 +668,99 @@ export function useGarageStore(companyId?: string) {
       }]);
     },
     searchTicket,
+    fetchActiveReminder: async (patente: string): Promise<Reminder | null> => {
+      if (!companyId) return null;
+      try {
+        const normalizedInput = patente.replace(/[\s\.\-·]/g, '').toUpperCase();
+        
+        const { data, error } = await supabaseGarage
+          .from('garage_reminders')
+          .select('*')
+          .eq('company_id', companyId)
+          .eq('patente', normalizedInput)
+          .eq('completed', false)
+          .maybeSingle();
+
+        if (error) throw error;
+        return data as Reminder;
+      } catch (e) {
+        console.error('Error in fetchActiveReminder:', e);
+        return null;
+      }
+    },
     refreshData: fetchData,
     fetchCompanies: useCallback(async () => {
       const { data, error } = await supabase.from('companies').select('id, name, slug').ilike('name', '%roma center%').order('name');
       if (error) throw error;
       return data;
     }, []),
-    fetchPublicVehicleInfo: async (patente: string, company_id: string) => {
-      const normalizedInput = patente.replace(/[\s\.\-·]/g, '').toUpperCase();
-      
-      // 1. Intentar obtener el modelo desde garage_tickets (más directo por ID)
-      const { data: ticketData } = await supabaseGarage
-        .from('garage_tickets')
-        .select('model')
-        .eq('company_id', company_id)
-        .eq('id', normalizedInput)
-        .maybeSingle();
-
-      // 2. Intentar obtener el dueño desde garage_customers
-      // Usamos una búsqueda más flexible para evitar errores 400 de tipos de columna
+    fetchPublicVehicleInfo: async (company_id: string, identificador: string) => {
       let customerData: any = null;
-      const normalizedQuery = normalizedInput.toLowerCase();
-      
+      let ticketData: any = null;
+
+      // Normalizar input (remover espacios y guiones para patentes)
+      const normalizedInput = identificador.trim().replace(/[-\s\.\-·]/g, '').toUpperCase();
+
+      // 1. Buscar en garage_tickets (historial de trabajos) para obtener datos rápidos del vehículo
       try {
-        // Intento 1: Búsqueda exacta en array (estándar) con filtro explícito
-        const { data, error } = await supabaseGarage
-          .from('garage_customers')
-          .select('name, phone, last_model')
+        const { data: ticket } = await supabaseGarage
+          .from('garage_tickets')
+          .select('*')
           .eq('company_id', company_id)
-          .filter('vehicles', 'cs', `{"${normalizedInput}"}`)
+          .eq('id', normalizedInput)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (ticket) ticketData = ticket;
+      } catch (e) {}
+
+      // 2. Buscar en garage_customers (base de datos de clientes)
+      // Intentar primero por patente asociada (last_vehicle_id)
+      try {
+        const { data: customerByVehicle } = await supabaseGarage
+          .from('garage_customers')
+          .select('name, phone, last_model, last_vehicle_id')
+          .eq('company_id', company_id)
+          .ilike('last_vehicle_id', normalizedInput)
           .maybeSingle();
         
-        if (!error && data) customerData = data;
-      } catch (e) {
-        console.warn('Vehicle array lookup failed:', e);
-      }
-
-      if (!customerData) {
-        try {
-          // Intento 2: Búsqueda por texto (iliked) en la columna vehicles
-          // Nota: PostgREST permite ilike en columnas que no son texto si se fuerzan, 
-          // pero aquí lo usaremos como fallback de seguridad.
+        if (customerByVehicle) {
+          customerData = customerByVehicle;
+        } else {
+          // Fallback: Buscar en el array de vehículos (columna jsonb o array)
           const { data } = await supabaseGarage
             .from('garage_customers')
-            .select('name, phone, last_model')
+            .select('name, phone, last_model, last_vehicle_id')
             .eq('company_id', company_id)
-            .ilike('vehicles' as any, `%${normalizedInput}%`)
+            .contains('vehicles' as any, [normalizedInput])
             .maybeSingle();
-          customerData = data;
-        } catch (e) {
-          console.error('Final fallback lookup failed:', e);
+          if (data) customerData = data;
+        }
+      } catch (e) {}
+
+      // 3. Fallback: Intentar buscar por teléfono si el input es numérico
+      if (!customerData && !ticketData) {
+        const numericInput = identificador.replace(/\D/g, '');
+        if (numericInput.length >= 8) {
+            try {
+                const { data: byPhone } = await supabaseGarage
+                    .from('garage_customers')
+                    .select('name, phone, last_model, last_vehicle_id')
+                    .eq('company_id', company_id)
+                    .ilike('phone', `%${numericInput}%`)
+                    .maybeSingle();
+                if (byPhone) customerData = byPhone;
+            } catch (e) {}
         }
       }
 
       if (!customerData && !ticketData) return null;
 
       return {
-        owner_name: customerData?.name || '',
-        owner_phone: customerData?.phone || '',
-        model: customerData?.last_model || ticketData?.model || ''
+        owner_name: customerData?.name || ticketData?.owner_name || '',
+        owner_phone: customerData?.phone || ticketData?.owner_phone || '',
+        model: customerData?.last_model || ticketData?.model || '',
+        vehicle_id: customerData?.last_vehicle_id || ticketData?.id || normalizedInput
       };
     },
     fetchPublicSettingsBySlug: async (slug: string) => {
@@ -778,6 +812,58 @@ export function useGarageStore(companyId?: string) {
       if (error) {
         console.error('Supabase error adding public reminder:', error);
         throw error;
+      }
+
+      // 1.5 "Inteligencia": Actualizar o crear registro del cliente/vehículo
+      try {
+        const normalizedPatente = reminder.patente?.trim().replace(/[-\s]/g, '').toUpperCase();
+        const numericPhone = reminder.customer_phone?.replace(/\D/g, '');
+
+        if (normalizedPatente || numericPhone) {
+          // Intentar encontrar cliente existente
+          const { data: existingCustomer } = await supabaseGarage
+            .from('garage_customers')
+            .select('id, name, phone, last_model, last_vehicle_id')
+            .eq('company_id', reminder.company_id)
+            .or(`last_vehicle_id.ilike.${normalizedPatente},phone.ilike.%${numericPhone}%`)
+            .maybeSingle();
+
+          if (existingCustomer) {
+            // Actualizar si hay cambios significativos
+            const hasChanges = 
+              existingCustomer.name !== reminder.customer_name || 
+              existingCustomer.phone !== reminder.customer_phone ||
+              existingCustomer.last_model !== reminder.vehicle_model ||
+              existingCustomer.last_vehicle_id !== normalizedPatente;
+
+            if (hasChanges) {
+              await supabaseGarage
+                .from('garage_customers')
+                .update({
+                  name: reminder.customer_name,
+                  phone: reminder.customer_phone,
+                  last_model: reminder.vehicle_model,
+                  last_vehicle_id: normalizedPatente,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', existingCustomer.id);
+            }
+          } else if (reminder.customer_name && reminder.customer_phone) {
+            // Crear nuevo cliente si no existe (opcional, pero útil para CRM)
+            await supabaseGarage
+              .from('garage_customers')
+              .insert([{
+                company_id: reminder.company_id,
+                name: reminder.customer_name,
+                phone: reminder.customer_phone,
+                last_model: reminder.vehicle_model,
+                last_vehicle_id: normalizedPatente,
+                vehicles: normalizedPatente ? [normalizedPatente] : []
+              }]);
+          }
+        }
+      } catch (upsertError) {
+        console.warn('Silent failure on customer intelligence update:', upsertError);
       }
 
       // 2. Create notification for the workshop

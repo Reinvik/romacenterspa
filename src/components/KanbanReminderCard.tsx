@@ -1,8 +1,8 @@
 import React from 'react';
 import { Reminder, GarageSettings } from '../types';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Clock, User, Calendar, MessageCircle, MoreVertical } from 'lucide-react';
+import { Clock, User, Calendar, MessageCircle, MoreVertical, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface KanbanReminderCardProps {
@@ -13,17 +13,48 @@ interface KanbanReminderCardProps {
 }
 
 export function KanbanReminderCard({ reminder, settings, onDragStart }: KanbanReminderCardProps) {
-  const date = parseISO(reminder.planned_date);
+  // Combinar fecha y hora de forma segura para evitar problemas de zona horaria
+  const cleanDate = (reminder.planned_date || '').substring(0, 10);
+  const dateStr = `${cleanDate}T${reminder.planned_time || '00:00'}:00`;
+  const date = parseISO(dateStr);
+  const isDateValid = isValid(date);
   
+  const safeFormatDateSimplified = (dateStr: string | undefined | null) => {
+    try {
+      if (!dateStr) return 'N/A';
+      const date = parseISO(`${dateStr.substring(0, 10)}T00:00:00`);
+      return format(date, "dd/MM/yyyy");
+    } catch (e) {
+      return 'N/A';
+    }
+  };
+
   const handleWhatsApp = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!reminder.customer_phone) return;
+    if (!reminder.customer_phone || !isDateValid) return;
 
     const message = `Hola ${reminder.customer_name}, confirmamos tu cita para el ${format(date, "EEEE d 'de' MMMM", { locale: es })} a las ${format(date, 'HH:mm')} para tu ${reminder.vehicle_model} (${reminder.patente}).`;
     const encodedMessage = encodeURIComponent(message);
     const phone = reminder.customer_phone.replace(/\D/g, '');
     window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
   };
+
+  const isToday = isDateValid && format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+  const isTomorrow = isDateValid && format(date, 'yyyy-MM-dd') === format(new Date(Date.now() + 86400000), 'yyyy-MM-dd');
+
+  if (!isDateValid) {
+    return (
+      <div className="bg-red-50 p-3 rounded-2xl border border-red-200 flex flex-col gap-2">
+        <div className="flex items-center gap-2 text-red-600 font-bold text-xs uppercase">
+          <AlertCircle className="w-4 h-4" />
+          Error de Fecha
+        </div>
+        <p className="text-[10px] text-red-500 font-medium">
+          Dato corrupto: {reminder.planned_date} {reminder.planned_time}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -58,10 +89,10 @@ export function KanbanReminderCard({ reminder, settings, onDragStart }: KanbanRe
       <div className="flex items-center gap-2 px-2 py-1.5 bg-amber-50 rounded-xl border border-amber-100">
         <Clock className="w-5 h-5 text-amber-600" />
         <span className="text-sm font-black text-amber-700">
-          {format(date, 'HH:mm')} hrs
+          {reminder.planned_time || format(date, 'HH:mm')} hrs
         </span>
         <span className="text-[10px] text-amber-600 font-black ml-auto">
-           Reserva Hoy
+           {isDateValid ? format(date, 'dd-MM') : ''}
         </span>
       </div>
 
@@ -70,9 +101,6 @@ export function KanbanReminderCard({ reminder, settings, onDragStart }: KanbanRe
           <div className="flex items-center gap-1.5 text-[10px] text-zinc-600 font-bold truncate">
             <User className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
             <span className="truncate">{reminder.customer_name}</span>
-          </div>
-          <div className="text-[9px] text-zinc-500 font-medium">
-             Cita Web: {reminder.reminder_type}
           </div>
         </div>
 

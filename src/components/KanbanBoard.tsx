@@ -24,11 +24,15 @@ interface KanbanBoardProps {
   onPromoteReminder?: (reminder: Reminder, targetStatus: TicketStatus) => Promise<void>;
   reminders?: Reminder[];
   settings: GarageSettings | null;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  viewDate: string;
+  setViewDate: (date: string) => void;
 }
 
 const COLUMNS: { id: string; label: string; color: string; statuses: TicketStatus[] }[] = [
   { id: 'por-atender', label: 'Por Atender', color: 'bg-zinc-200 text-zinc-700', statuses: ['Ingresado', 'En Espera'] },
-  { id: 'En Reparación', label: 'En Reparación', color: 'bg-blue-100 text-blue-800', statuses: ['En Reparación'] },
+  { id: 'En Mantención', label: 'En Mantención', color: 'bg-blue-100 text-blue-800', statuses: ['En Mantención', 'En Reparación'] },
   { id: 'Listo para Entrega', label: 'Listo para Entrega', color: 'bg-emerald-100 text-emerald-800', statuses: ['Listo para Entrega'] },
   { id: 'Finalizado', label: 'Finalizado', color: 'bg-zinc-800 text-zinc-300', statuses: ['Finalizado'] },
 ];
@@ -43,12 +47,14 @@ export function KanbanBoard({
   onUpdateNotes,
   onPromoteReminder,
   reminders = [],
-  settings
+  settings,
+  searchTerm,
+  setSearchTerm,
+  viewDate,
+  setViewDate
 }: KanbanBoardProps) {
   const [draggedTicketId, setDraggedTicketId] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewDate, setViewDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [selectedMechanic, setSelectedMechanic] = useState<string | null>(null);
   const [historyTicket, setHistoryTicket] = useState<Ticket | null>(null);
@@ -104,6 +110,7 @@ export function KanbanBoard({
   });
 
   const [softLockPending, setSoftLockPending] = useState<{id: string, status: TicketStatus, mechanic: string} | null>(null);
+  const [finishConfirmPending, setFinishConfirmPending] = useState<{id: string, action: string} | null>(null);
 
   const matchedReminders = searchTerm.length >= 2 ? reminders.filter(r =>
     r.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -152,6 +159,14 @@ export function KanbanBoard({
       let targetStatus: TicketStatus = statusId as TicketStatus;
       if (statusId === 'por-atender') targetStatus = 'En Espera';
 
+      if (targetStatus === 'Finalizado') {
+        const ticket = tickets.find(t => t.id === id);
+        if (ticket && ticket.status !== 'Finalizado') {
+          setFinishConfirmPending({ id, action: userAction });
+          return;
+        }
+      }
+
       if (ticket && selectedMechanic && ticket.mechanic !== selectedMechanic && ticket.mechanic !== 'Sin asignar') {
         // Soft Lock
         setSoftLockPending({ id, status: targetStatus, mechanic: ticket.mechanic });
@@ -167,61 +182,6 @@ export function KanbanBoard({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 flex-1 w-full">
-          <h2 className="text-2xl font-bold tracking-tight text-zinc-900">Flujo de Trabajo</h2>
-          <div className="relative flex-1 max-w-md w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-            <input
-              type="text"
-              placeholder="Buscar cliente, patente o cita..."
-              className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
-
-          <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
-            <input
-              type="date"
-              className="pl-9 pr-4 py-2 text-sm rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all bg-white text-zinc-900 font-bold"
-              value={viewDate}
-              onChange={e => setViewDate(e.target.value)}
-            />
-          </div>
-          
-          
-          {searchTerm && matchedReminders.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-2 p-4 bg-emerald-50 border border-emerald-100 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto w-full max-w-md ml-0 md:ml-32">
-              <div className="flex items-center gap-2 mb-2">
-                <CalendarCheck className="w-4 h-4 text-emerald-600" />
-                <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Citas Agendadas</span>
-              </div>
-              <div className="space-y-2">
-                {matchedReminders.map(r => (
-                  <div key={r.id} className="flex items-center justify-between bg-white p-2 rounded-lg border border-emerald-100 shadow-sm">
-                    <div>
-                      <div className="text-xs font-bold text-zinc-900">{r.customer_name}</div>
-                      <div className="text-[10px] text-zinc-500">{r.patente} • {new Date(r.planned_date).toLocaleDateString()}</div>
-                    </div>
-                    <div className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full capitalize">
-                      {r.reminder_type}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        <button
-          onClick={onAddTicket}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors shadow-sm w-full md:w-auto justify-center"
-        >
-          <Plus className="w-5 h-5" />
-          Nuevo Ingreso
-        </button>
-      </div>
 
 
       {/* Filtros de Mecánicos */}
@@ -402,6 +362,19 @@ export function KanbanBoard({
           }
         }}
         onCancel={() => setShowClearConfirm(false)}
+      />
+
+      <ConfirmModal
+        isOpen={!!finishConfirmPending}
+        title="Finalizar Trabajo"
+        message="¿Estás seguro de finalizar este trabajo? Una vez finalizado, la tarjeta quedará bloqueada y no se podrá modificar ni mover."
+        onConfirm={() => {
+          if (finishConfirmPending) {
+            onUpdateStatus(finishConfirmPending.id, 'Finalizado', finishConfirmPending.action);
+            setFinishConfirmPending(null);
+          }
+        }}
+        onCancel={() => setFinishConfirmPending(null)}
       />
 
       <ConfirmModal

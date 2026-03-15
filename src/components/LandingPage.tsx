@@ -120,7 +120,7 @@ export function LandingPage({
       <nav className="fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-md border-b border-zinc-100">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-16 h-16 bg-zinc-900 rounded-xl flex items-center justify-center overflow-hidden">
+            <div className="w-16 h-16 bg-black rounded-xl flex items-center justify-center overflow-hidden">
               <img src="/logo3.png" alt="Roma Center Logo" className="w-14 h-14 object-contain" />
             </div>
             <span className="text-xl font-black tracking-tighter text-zinc-900 uppercase">Roma Center<span style={{ color: primaryColor }}>.</span></span>
@@ -144,7 +144,7 @@ export function LandingPage({
           <div className="relative z-10 space-y-8 animate-in slide-in-from-left duration-700">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-100">
               <Star className="w-3 h-3 fill-current" style={{ color: primaryColor }} />
-              <span className="text-[10px] font-black uppercase tracking-wider">Servicio Automotriz Premium</span>
+              <span className="text-[10px] font-black uppercase tracking-wider">Av. El Rosal 6065, Maipú</span>
             </div>
             <h1 className="text-6xl md:text-7xl font-black text-zinc-900 leading-[1.1] tracking-tighter">
               Tu Lubricentro de <br />

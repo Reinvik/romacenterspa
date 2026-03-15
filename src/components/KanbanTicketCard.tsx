@@ -1,6 +1,6 @@
 import React from 'react';
 import { Ticket, GarageSettings } from '../types';
-import { formatDistanceToNow, parseISO, differenceInDays } from 'date-fns';
+import { formatDistanceToNow, parseISO, differenceInDays, formatDistance } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Clock, User, MoreVertical, MessageCircle, AlertCircle, History } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -20,7 +20,7 @@ interface KanbanTicketCardProps {
 const statusMap: Record<string, string> = {
   'Ingresado': 'ingresado',
   'En Espera': 'en espera',
-  'En Reparación': 'en proceso',
+  'En Mantención': 'en proceso',
   'Listo para Entrega': 'listo para entrega',
   'Finalizado': 'entregado'
 };
@@ -28,7 +28,13 @@ const statusMap: Record<string, string> = {
 export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged, onDragStart, onEdit, onShowHistory, onShowCRM }: KanbanTicketCardProps) {
   const entryDate = ticket.entry_date ? parseISO(ticket.entry_date) : new Date();
   const isValidDate = !isNaN(entryDate.getTime());
-  const daysInShop = isValidDate ? differenceInDays(new Date(), entryDate) : 0;
+  
+  // Si está finalizado, congelamos el tiempo usando close_date
+  const referenceDate = (ticket.status === 'Finalizado' && ticket.close_date) 
+    ? parseISO(ticket.close_date) 
+    : new Date();
+
+  const daysInShop = isValidDate ? differenceInDays(referenceDate, entryDate) : 0;
   const isAttenuated = selectedMechanic && ticket.mechanic !== selectedMechanic;
 
   // Determinar color de "días"
@@ -57,7 +63,7 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
 
   return (
     <div
-      draggable
+      draggable={ticket.status !== 'Finalizado'}
       onDragStart={(e) => onDragStart(e, ticket.id)}
       className={cn(
         "bg-white p-3 rounded-2xl shadow-sm border border-zinc-200 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group flex flex-col gap-2.5",
@@ -101,13 +107,15 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
               <Clock className="w-4 h-4" />
             </button>
           )}
-          <button
-            onClick={() => onEdit(ticket)}
-            className="text-zinc-400 hover:text-emerald-600 p-1 hover:bg-zinc-100 rounded-lg transition-colors"
-            title="Editar Ticket"
-          >
-            <MoreVertical className="w-4 h-4" />
-          </button>
+          {ticket.status !== 'Finalizado' && (
+            <button
+              onClick={() => onEdit(ticket)}
+              className="text-zinc-400 hover:text-emerald-600 p-1 hover:bg-zinc-100 rounded-lg transition-colors"
+              title="Editar Ticket"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -123,8 +131,12 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-medium">
             <Clock className="w-3.5 h-3.5 text-zinc-400" />
-            <span title={isValidDate ? formatDistanceToNow(entryDate, { addSuffix: true, locale: es }) : ''}>
-              {isValidDate ? formatDistanceToNow(entryDate, { locale: es }) : 'N/A'}
+            <span title={isValidDate ? (ticket.status === 'Finalizado' && ticket.close_date ? formatDistance(entryDate, referenceDate, { addSuffix: true, locale: es }) : formatDistanceToNow(entryDate, { addSuffix: true, locale: es })) : ''}>
+              {isValidDate 
+                ? (ticket.status === 'Finalizado' && ticket.close_date 
+                    ? formatDistance(entryDate, referenceDate, { locale: es }) 
+                    : formatDistanceToNow(entryDate, { locale: es }))
+                : 'N/A'}
             </span>
           </div>
         </div>

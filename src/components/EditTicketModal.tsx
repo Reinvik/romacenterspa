@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket, Mechanic, Part } from '../types';
-import { X, Save, User, FileText, Loader2, Package, Trash2, Plus, CheckCircle2 } from 'lucide-react';
+import { X, Save, User, FileText, Loader2, Package, Trash2, Plus, CheckCircle2, Camera, Image as ImageIcon, ImagePlus } from 'lucide-react';
 
 interface EditTicketModalProps {
     isOpen: boolean;
@@ -19,7 +19,9 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     const [vin, setVin] = useState('');
     const [engineId, setEngineId] = useState('');
     const [mileage, setMileage] = useState<number>(0);
+    const [jobPhotos, setJobPhotos] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
         if (ticket) {
@@ -30,6 +32,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
             setVin(ticket.vin || '');
             setEngineId(ticket.engine_id || '');
             setMileage(ticket.mileage || 0);
+            setJobPhotos(ticket.job_photos || []);
         }
     }, [ticket]);
 
@@ -59,7 +62,8 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                 quotation_total: quotationTotal,
                 vin,
                 engine_id: engineId,
-                mileage
+                mileage,
+                job_photos: jobPhotos
             });
             onClose();
         } catch (error) {
@@ -198,25 +202,55 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                             ))}
                         </select>
                     </div>
-
-                    <div className="space-y-2">
-                        <label className="text-sm font-semibold text-zinc-700 flex items-center gap-2">
-                            <span className="text-emerald-600 font-bold">$</span>
-                            Monto de Cotización
+                    
+                    {/* Evidencia Fotográfica */}
+                    <div className="space-y-3">
+                        <label className="text-sm font-semibold text-zinc-700 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Camera className="w-4 h-4 text-zinc-400" />
+                                Fotos del Trabajo
+                            </div>
+                            <span className="text-[10px] text-zinc-400 font-normal">{jobPhotos.length}/6 fotos</span>
                         </label>
-                        <input
-                            type="number"
-                            placeholder="0"
-                            className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-zinc-800 font-mono disabled:opacity-50"
-                            value={quotationTotal}
-                            onChange={e => setQuotationTotal(Number(e.target.value))}
-                            disabled={isFinalized}
-                        />
-                        {ticket.quotation_accepted && (
-                            <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> Cotización aceptada por el cliente
-                            </p>
-                        )}
+                        
+                        <div className="grid grid-cols-3 gap-2">
+                            {jobPhotos.map((photo, index) => (
+                                <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-zinc-200 group/photo">
+                                    <img src={photo} alt={`Trabajo ${index + 1}`} className="w-full h-full object-cover" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setJobPhotos(prev => prev.filter((_, i) => i !== index))}
+                                        className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover/photo:opacity-100 transition-opacity"
+                                        disabled={isFinalized}
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            ))}
+                            
+                            {jobPhotos.length < 6 && !isFinalized && (
+                                <label className="aspect-square rounded-xl border-2 border-dashed border-zinc-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all cursor-pointer flex flex-col items-center justify-center gap-1 text-zinc-400 hover:text-emerald-600">
+                                    <ImagePlus className="w-6 h-6" />
+                                    <span className="text-[10px] font-bold">Añadir</span>
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        capture="environment"
+                                        className="hidden" 
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => {
+                                                    setJobPhotos(prev => [...prev, reader.result as string]);
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                    />
+                                </label>
+                            )}
+                        </div>
                     </div>
 
                     <div className="pt-4 flex justify-end gap-3 border-t border-zinc-100">

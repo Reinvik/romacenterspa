@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Wrench, Package, Users, Settings, LogOut, Bell, Calendar, Menu, X, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Wrench, Package, Users, Settings, LogOut, Bell, Calendar, Menu, X, BarChart3, Search, CalendarCheck, Plus, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -16,11 +16,22 @@ interface LayoutProps {
   settings: GarageSettings | null;
   isSuperAdmin?: boolean;
   branding?: any;
+  searchTerm?: string;
+  setSearchTerm?: (term: string) => void;
+  viewDate?: string;
+  setViewDate?: (date: string) => void;
+  onAddTicket?: () => void;
+  onRefresh?: () => Promise<void>;
+  reminders?: any[];
 }
 
-export function Layout({ children, activeTab, setActiveTab, onLogout, notifications, markAsRead, settings, isSuperAdmin, branding }: LayoutProps) {
+export function Layout({ 
+  children, activeTab, setActiveTab, onLogout, notifications, markAsRead, settings, isSuperAdmin, branding,
+  searchTerm, setSearchTerm, viewDate, setViewDate, onAddTicket, onRefresh, reminders = []
+}: LayoutProps) {
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [logoError, setLogoError] = React.useState(false);
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -79,7 +90,9 @@ export function Layout({ children, activeTab, setActiveTab, onLogout, notificati
                   onError={() => setLogoError(true)}
                 />
               ) : (
-                <img src="/logo3.png" alt="Roma Center Logo" className="w-14 h-14 object-contain" />
+                <div className="w-16 h-16 bg-black rounded-xl flex items-center justify-center p-1 border border-zinc-700">
+                  <img src="/logo3.png" alt="Roma Center SPA" className="w-14 h-14 object-contain" />
+                </div>
               )}
             </div>
             <span className="font-bold text-lg tracking-tight leading-tight">{settings?.workshop_name || 'Roma Center SPA'}</span>
@@ -139,81 +152,101 @@ export function Layout({ children, activeTab, setActiveTab, onLogout, notificati
             Cerrar Sesión
           </button>
         </div>
+        <div className="p-4 bg-zinc-800/30">
+          <button
+            onClick={async () => {
+              if (onRefresh) {
+                setIsRefreshing(true);
+                await onRefresh();
+                setTimeout(() => setIsRefreshing(false), 1000);
+              }
+            }}
+            disabled={isRefreshing}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 w-full transition-all uppercase tracking-widest disabled:opacity-50"
+          >
+            <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
+            {isRefreshing ? 'Sincronizando...' : 'Refrescar Datos'}
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Header */}
         <header className="h-16 bg-white border-b border-zinc-200 flex items-center justify-between px-4 lg:px-8 shrink-0">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-1">
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="lg:hidden p-2 text-zinc-500 hover:bg-zinc-100 rounded-lg transition-colors"
             >
               <Menu className="w-6 h-6" />
             </button>
-            <h1 className="text-lg lg:text-xl font-bold tracking-tight text-zinc-800 truncate max-w-[150px] md:max-w-none">
-              {navItems.find(i => i.id === activeTab)?.label || 'Configuración'}
-            </h1>
+            {activeTab !== 'dashboard' ? (
+              <h1 className="text-lg lg:text-xl font-bold tracking-tight text-zinc-800 truncate max-w-[150px] md:max-w-none">
+                {navItems.find(i => i.id === activeTab)?.label || 'Configuración'}
+              </h1>
+            ) : (
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4 flex-1 w-full">
+                <h1 className="text-lg lg:text-xl font-bold tracking-tight text-zinc-900 whitespace-nowrap">Flujo de Trabajo</h1>
+                <div className="relative flex-1 max-w-md w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar cliente, patente o cita..."
+                    className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm?.(e.target.value)}
+                  />
+                </div>
+
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
+                  <input
+                    type="date"
+                    className="pl-9 pr-4 py-2 text-sm rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all bg-white text-zinc-900 font-bold"
+                    value={viewDate}
+                    onChange={e => setViewDate?.(e.target.value)}
+                  />
+                </div>
+
+                {searchTerm && searchTerm.length >= 2 && (
+                  <div className="absolute top-full left-0 right-0 mt-2 p-4 bg-emerald-50 border border-emerald-100 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto w-full max-w-md">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CalendarCheck className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Citas Agendadas</span>
+                    </div>
+                    <div className="space-y-2">
+                      {reminders.filter(r => 
+                        r.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        r.customer_phone.includes(searchTerm) ||
+                        r.patente.toLowerCase().includes(searchTerm.toLowerCase())
+                      ).map(r => (
+                        <div key={r.id} className="flex items-center justify-between bg-white p-2 rounded-lg border border-emerald-100 shadow-sm">
+                          <div>
+                            <div className="text-xs font-bold text-zinc-900">{r.customer_name}</div>
+                            <div className="text-[10px] text-zinc-500">{r.patente} • {new Date(r.planned_date).toLocaleDateString()}</div>
+                          </div>
+                          <div className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full capitalize">
+                            {r.reminder_type}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-3 md:gap-4 relative">
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2 text-zinc-400 hover:text-zinc-600 transition-colors rounded-full hover:bg-zinc-100"
-            >
-              <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-4 h-4 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white font-bold" 
-                      style={{ backgroundColor: menuHighlightColor }}>
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-
-            {showNotifications && (
-              <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-zinc-100 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                <div className="p-4 border-b border-zinc-50 bg-zinc-50/50 flex justify-between items-center">
-                  <h3 className="font-bold text-zinc-900 text-sm">Notificaciones</h3>
-                  {unreadCount > 0 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: highlightBg, color: menuHighlightColor }}>
-                      {unreadCount} nuevas
-                    </span>
-                  )}
-                </div>
-                <div className="max-h-96 overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <Bell className="w-8 h-8 text-zinc-200 mx-auto mb-2" />
-                      <p className="text-xs text-zinc-400">No tienes notificaciones aún.</p>
-                    </div>
-                  ) : (
-                    notifications.map(n => (
-                      <div
-                        key={n.id}
-                        className={cn(
-                          "p-4 border-b border-zinc-50 last:border-0 hover:bg-zinc-50 transition-colors cursor-pointer group",
-                          !n.read && "relative"
-                        )}
-                        style={{ backgroundColor: !n.read ? highlightBg : undefined }}
-                        onClick={() => markAsRead(n.id)}
-                      >
-                        <div className="flex justify-between items-start gap-2">
-                          <p className={cn("text-xs leading-relaxed", !n.read ? "text-zinc-900 font-semibold" : "text-zinc-600")}>
-                            {n.message}
-                          </p>
-                          {!n.read && (
-                            <div className="w-2 h-2 rounded-full shrink-0 mt-1" style={{ backgroundColor: menuHighlightColor }}></div>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-zinc-400 mt-2 block">
-                          {format(new Date(n.created_at), "d 'de' MMM, HH:mm", { locale: es })}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
+          <div className="flex items-center gap-3 md:gap-4 ml-4">
+            {activeTab === 'dashboard' && (
+              <button
+                onClick={onAddTicket}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors shadow-sm whitespace-nowrap"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="hidden sm:inline">Nuevo Ingreso</span>
+              </button>
             )}
           </div>
         </header>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
+import { format } from 'date-fns';
 import { KanbanBoard } from './components/KanbanBoard';
 import { AddTicketModal } from './components/AddTicketModal';
 import { Login } from './components/Login';
@@ -22,8 +23,22 @@ import { LandingPage } from './components/LandingPage';
 type ViewState = 'landing' | 'login' | 'customer' | 'dashboard';
 
 export default function App() {
-  const [view, setView] = useState<ViewState>('landing');
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [view, setView] = useState<ViewState>(() => {
+    const saved = localStorage.getItem('roma_garage_view');
+    return (saved as ViewState) || 'landing';
+  });
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('roma_garage_tab') || 'dashboard';
+  });
+  
+  useEffect(() => {
+    localStorage.setItem('roma_garage_view', view);
+  }, [view]);
+
+  useEffect(() => {
+    localStorage.setItem('roma_garage_tab', activeTab);
+  }, [activeTab]);
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddMechanicModalOpen, setIsAddMechanicModalOpen] = useState(false);
@@ -32,6 +47,10 @@ export default function App() {
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [searchedPatente, setSearchedPatente] = useState<string | null>(null);
   const [currentCustomerTicket, setCurrentCustomerTicket] = useState<Ticket | null>(null);
+  const [currentCustomerReminder, setCurrentCustomerReminder] = useState<Reminder | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewDate, setViewDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   const { isSuperAdmin, profile } = useAuth();
 
@@ -46,8 +65,8 @@ export default function App() {
     addMechanic, deleteMechanic,
     acceptQuotation, markNotificationAsRead,
     clearFinishedTickets, deleteTicket,
-    fetchCompanies, addPublicReminder, fetchPublicSettingsBySlug, fetchOccupiedReminders, fetchPublicVehicleInfo,
-    addReminder, deleteReminder, updateReminder
+    fetchCompanies, addPublicReminder, fetchActiveReminder, fetchPublicSettingsBySlug, fetchOccupiedReminders, fetchPublicVehicleInfo,
+    addReminder, deleteReminder, updateReminder, refreshData
   } = useGarageStore(profile?.company_id);
 
   useEffect(() => {
@@ -86,9 +105,19 @@ export default function App() {
     if (ticket) {
       setSearchedPatente(patente);
       setCurrentCustomerTicket(ticket);
+      setCurrentCustomerReminder(null);
+      setView('customer');
+      return;
+    }
+
+    const reminder = await fetchActiveReminder(patente);
+    if (reminder) {
+      setSearchedPatente(patente);
+      setCurrentCustomerTicket(null);
+      setCurrentCustomerReminder(reminder);
       setView('customer');
     } else {
-      alert('No se encontró un vehículo con esa patente.');
+      alert('No se encontró un vehículo o cita con esa patente.');
     }
   };
 
@@ -96,6 +125,7 @@ export default function App() {
     setView('landing');
     setSearchedPatente(null);
     setCurrentCustomerTicket(null);
+    setCurrentCustomerReminder(null);
     setActiveTab('dashboard');
   };
 
@@ -157,6 +187,7 @@ export default function App() {
     return (
       <CustomerPortal
         ticket={currentCustomerTicket}
+        reminder={currentCustomerReminder}
         settings={settings}
         onBack={handleBackToLogin}
         onAcceptQuotation={acceptQuotation}
@@ -174,6 +205,13 @@ export default function App() {
       settings={settings}
       isSuperAdmin={isSuperAdmin}
       branding={publicBranding}
+      searchTerm={searchTerm}
+      setSearchTerm={setSearchTerm}
+      viewDate={viewDate}
+      setViewDate={setViewDate}
+      onAddTicket={() => setIsAddModalOpen(true)}
+      onRefresh={refreshData}
+      reminders={reminders}
     >
       {activeTab === 'dashboard' && (
         <KanbanBoard
@@ -189,6 +227,10 @@ export default function App() {
             await updateTicket(id, { vehicle_notes: notes });
           }}
           onPromoteReminder={handlePromoteReminder}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          viewDate={viewDate}
+          setViewDate={setViewDate}
         />
       )}
 

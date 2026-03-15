@@ -75,13 +75,13 @@ export function Agenda({
     }, [currentMonth]);
 
     const dailyReminders = reminders.filter(r =>
-        format(parseISO(r.planned_date.includes('T') ? r.planned_date : `${r.planned_date}T00:00:00`), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
+        (r.planned_date.includes('T') ? r.planned_date.split('T')[0] : r.planned_date) === format(selectedDate, 'yyyy-MM-dd')
     );
 
     const pendingReminders = useMemo(() => {
         return reminders
             .filter(r => !r.completed)
-            .sort((a, b) => new Date(a.planned_date).getTime() - new Date(b.planned_date).getTime());
+            .sort((a, b) => new Date(b.planned_date).getTime() - new Date(a.planned_date).getTime());
     }, [reminders]);
 
     const vehicleModels = useMemo(() => {
@@ -93,12 +93,18 @@ export function Agenda({
 
     const hasReminder = (date: Date) => {
         const dateStr = format(date, 'yyyy-MM-dd');
-        return reminders.some(r => format(parseISO(r.planned_date.includes('T') ? r.planned_date : `${r.planned_date}T00:00:00`), 'yyyy-MM-dd') === dateStr);
+        return reminders.some(r => {
+            const rDateStr = r.planned_date.includes('T') ? r.planned_date.split('T')[0] : r.planned_date;
+            return rDateStr === dateStr;
+        });
     };
 
     const hasPendingReminder = (date: Date) => {
         const dateStr = format(date, 'yyyy-MM-dd');
-        return reminders.some(r => format(parseISO(r.planned_date.includes('T') ? r.planned_date : `${r.planned_date}T00:00:00`), 'yyyy-MM-dd') === dateStr && !r.completed);
+        return reminders.some(r => {
+            const rDateStr = r.planned_date.includes('T') ? r.planned_date.split('T')[0] : r.planned_date;
+            return rDateStr === dateStr && !r.completed;
+        });
     };
 
     const filteredCustomers = searchTerm.length >= 2
@@ -140,8 +146,25 @@ export function Agenda({
     };
 
     const sendWhatsApp = (reminder: Reminder) => {
-        const message = `Hola ${reminder.customer_name}, te escribimos de ${settings?.workshop_name || 'tu taller'} para recordarte que tienes programada una ${reminder.reminder_type} para tu vehículo ${reminder.vehicle_model} (${reminder.patente}) el día ${format(new Date(reminder.planned_date), 'dd/MM/yy')}.`;
-        window.open(`https://wa.me/${reminder.customer_phone}?text=${encodeURIComponent(message)}`, '_blank');
+        try {
+            const dateStr = reminder.planned_date || '';
+            const rDate = parseISO(`${dateStr.substring(0, 10)}T00:00:00`);
+            const message = `Hola ${reminder.customer_name}, te escribimos de ${settings?.workshop_name || 'tu taller'} para recordarte que tienes programada una ${reminder.reminder_type} para tu vehículo ${reminder.vehicle_model} (${reminder.patente}) el día ${format(rDate, 'dd/MM/yy')}.`;
+            window.open(`https://wa.me/${reminder.customer_phone}?text=${encodeURIComponent(message)}`, '_blank');
+        } catch (e) {
+            console.error('Error formatting date for WhatsApp:', e);
+            alert('Error al generar el mensaje de WhatsApp. Verifique la fecha.');
+        }
+    };
+
+    const safeFormatDateReminders = (dateStr: string) => {
+        try {
+            if (!dateStr) return 'N/A';
+            const date = parseISO(`${dateStr.substring(0, 10)}T00:00:00`);
+            return format(date, "EEEE d 'de' MMMM", { locale: es });
+        } catch (e) {
+            return 'Fecha inválida';
+        }
     };
 
     const weekDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -207,55 +230,52 @@ export function Agenda({
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {pendingReminders.map(r => {
-                                    const rDate = parseISO(r.planned_date);
-                                    return (
-                                        <div key={r.id} className="bg-white p-5 rounded-3xl border border-zinc-200 hover:border-emerald-500 transition-all shadow-sm group">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{format(rDate, "EEEE d 'de' MMMM", { locale: es })}</span>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 flex items-center gap-1">
-                                                            <Clock className="w-3 h-3" /> {format(rDate, 'HH:mm')}
-                                                        </span>
-                                                        <span className={cn(
-                                                            "text-[10px] font-bold px-2 py-0.5 rounded-lg border",
-                                                            r.reminder_type === 'Cita Web'
-                                                                ? "bg-blue-50 text-blue-600 border-blue-100"
-                                                                : "bg-zinc-100 text-zinc-500 border-zinc-200"
-                                                        )}>
-                                                            {r.reminder_type}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onClick={() => deleteReminder(r.id)}
-                                                    className="p-1.5 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                            
-                                            <div className="mb-4">
-                                                <h4 className="font-black text-zinc-900 truncate">{r.customer_name}</h4>
-                                                <div className="flex items-center gap-2 mt-2">
-                                                    <span className="text-[10px] font-mono font-black text-white bg-zinc-900 px-1.5 py-0.5 rounded uppercase">
-                                                        {r.patente}
+                                {pendingReminders.map(r => (
+                                    <div key={r.id} className="bg-white p-5 rounded-3xl border border-zinc-200 hover:border-emerald-500 transition-all shadow-sm group">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{safeFormatDateReminders(r.planned_date)}</span>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 flex items-center gap-1">
+                                                        <Clock className="w-3 h-3" /> {r.planned_time || '00:00'}
                                                     </span>
-                                                    <span className="text-xs text-zinc-500 font-medium truncate">{r.vehicle_model}</span>
+                                                    <span className={cn(
+                                                        "text-[10px] font-bold px-2 py-0.5 rounded-lg border",
+                                                        r.reminder_type === 'Cita Web'
+                                                            ? "bg-blue-50 text-blue-600 border-blue-100"
+                                                            : "bg-zinc-100 text-zinc-500 border-zinc-200"
+                                                    )}>
+                                                        {r.reminder_type}
+                                                    </span>
                                                 </div>
                                             </div>
-
                                             <button
-                                                onClick={() => sendWhatsApp(r)}
-                                                className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-[10px] transition-all shadow-lg shadow-emerald-500/20 uppercase tracking-wider"
+                                                onClick={() => deleteReminder(r.id)}
+                                                className="p-1.5 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                                             >
-                                                <Send className="w-3.5 h-3.5" />
-                                                Confirmar WhatsApp
+                                                <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
-                                    );
-                                })}
+                                        
+                                        <div className="mb-4">
+                                            <h4 className="font-black text-zinc-900 truncate">{r.customer_name}</h4>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className="text-[10px] font-mono font-black text-white bg-zinc-900 px-1.5 py-0.5 rounded uppercase">
+                                                    {r.patente}
+                                                </span>
+                                                <span className="text-xs text-zinc-500 font-medium truncate">{r.vehicle_model}</span>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={() => sendWhatsApp(r)}
+                                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-[10px] transition-all shadow-lg shadow-emerald-500/20 uppercase tracking-wider"
+                                        >
+                                            <Send className="w-3.5 h-3.5" />
+                                            Confirmar WhatsApp
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
@@ -397,9 +417,8 @@ export function Agenda({
                             </div>
                         ) : (
                             dailyReminders.map((r) => {
-                                const rDate = parseISO(r.planned_date);
-                                const timeFormat = format(rDate, 'HH:mm');
-                                const hasTime = timeFormat !== '00:00';
+                                    const timeFormat = r.planned_time || '00:00';
+                                    const hasTime = timeFormat !== '00:00';
 
                                 return (
                                 <div key={r.id} className={cn(

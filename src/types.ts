@@ -1,6 +1,7 @@
 export type TicketStatus =
   | 'Ingresado'
   | 'En Espera'
+  | 'En Mantención'
   | 'En Reparación'
   | 'Listo para Entrega'
   | 'Finalizado'
@@ -18,6 +19,7 @@ export interface ServiceLogEntry {
   parts: string[];
   cost?: number;
   mileage?: number;
+  job_photos?: string[];
 }
 
 export interface Ticket {
@@ -43,6 +45,7 @@ export interface Ticket {
   status_history?: TicketHistoryEntry[];
   service_log?: ServiceLogEntry[];
   vehicle_notes?: string;
+  job_photos?: string[];
 }
 
 export interface Mechanic {
