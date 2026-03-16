@@ -204,7 +204,11 @@ export function PublicBookingModal({ isOpen, onClose, fetchCompanies, onAddRemin
                     </div>
                     <h2 className="text-2xl font-bold text-zinc-900 mb-2">¡Cita Agendada!</h2>
                     <p className="text-zinc-500 mb-8 leading-relaxed">
-                        Tu visita a <strong>{formData.company_name}</strong> ha sido registrada para el <span className="text-zinc-900 font-semibold">{format(parseISO(`${formData.planned_date.substring(0, 10)}T00:00:00`), "EEEE d 'de' MMMM", { locale: es })}</span> a las <span className="text-zinc-900 font-semibold">{formData.planned_time} hrs</span>.
+                        Tu visita a <strong>{formData.company_name}</strong> ha sido registrada para {
+                            formData.planned_date === format(new Date(), 'yyyy-MM-dd') 
+                                ? <span className="text-emerald-600 font-bold uppercase tracking-wider">Hoy</span>
+                                : <span className="text-zinc-900 font-semibold">{format(parseISO(`${formData.planned_date.substring(0, 10)}T00:00:00`), "EEEE d 'de' MMMM", { locale: es })}</span>
+                        } a las <span className="text-zinc-900 font-semibold">{formData.planned_time} hrs</span>.
                     </p>
                     <div className="space-y-3">
                         <button

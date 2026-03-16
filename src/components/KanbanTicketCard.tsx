@@ -2,7 +2,7 @@ import React from 'react';
 import { Ticket, GarageSettings } from '../types';
 import { formatDistanceToNow, parseISO, differenceInDays, formatDistance } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Clock, User, MoreVertical, MessageCircle, AlertCircle, History } from 'lucide-react';
+import { Clock, User, MoreVertical, MessageCircle, AlertCircle, History, Camera } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface KanbanTicketCardProps {
@@ -128,6 +128,12 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
           <div className="flex items-center gap-1.5 text-[10px] text-zinc-600 font-bold truncate">
             <User className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
             <span className="truncate">{ticket.mechanic}</span>
+            {ticket.job_photos && ticket.job_photos.length > 0 && (
+              <div className="flex items-center gap-0.5 ml-1 text-emerald-600 font-bold bg-emerald-50 px-1 rounded-sm">
+                <Camera className="w-3 h-3" />
+                <span>{ticket.job_photos.length}</span>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-medium">
             <Clock className="w-3.5 h-3.5 text-zinc-400" />

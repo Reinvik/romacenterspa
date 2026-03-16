@@ -47,6 +47,7 @@ export default function App() {
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [searchedPatente, setSearchedPatente] = useState<string | null>(null);
   const [currentCustomerTicket, setCurrentCustomerTicket] = useState<Ticket | null>(null);
+  const [currentCustomerTickets, setCurrentCustomerTickets] = useState<Ticket[]>([]);
   const [currentCustomerReminder, setCurrentCustomerReminder] = useState<Reminder | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,8 +66,9 @@ export default function App() {
     addMechanic, deleteMechanic,
     acceptQuotation, markNotificationAsRead,
     clearFinishedTickets, deleteTicket,
+    searchTicketsHistory,
     fetchCompanies, addPublicReminder, fetchActiveReminder, fetchPublicSettingsBySlug, fetchOccupiedReminders, fetchPublicVehicleInfo,
-    addReminder, deleteReminder, updateReminder, refreshData
+    addReminder, deleteReminder, updateReminder, refreshData, uploadTicketPhoto
   } = useGarageStore(profile?.company_id);
 
   useEffect(() => {
@@ -100,24 +102,42 @@ export default function App() {
     setView('dashboard');
   };
 
-  const handleCustomerSearch = async (patente: string) => {
-    const ticket = await searchTicket(patente);
-    if (ticket) {
-      setSearchedPatente(patente);
-      setCurrentCustomerTicket(ticket);
-      setCurrentCustomerReminder(null);
-      setView('customer');
-      return;
-    }
+  const handleCustomerSearch = async (patenteOrPhone: string) => {
+    try {
+      const tickets = await searchTicketsHistory(patenteOrPhone);
+      const reminder = await fetchActiveReminder(patenteOrPhone);
 
-    const reminder = await fetchActiveReminder(patente);
-    if (reminder) {
-      setSearchedPatente(patente);
-      setCurrentCustomerTicket(null);
-      setCurrentCustomerReminder(reminder);
-      setView('customer');
-    } else {
-      alert('No se encontró un vehículo o cita con esa patente.');
+      if (tickets.length > 0) {
+        // Ordenar: No finalizados primero, luego por fecha de creación desc
+        const sorted = [...tickets].sort((a, b) => {
+          if (a.status !== 'Finalizado' && b.status === 'Finalizado') return -1;
+          if (a.status === 'Finalizado' && b.status !== 'Finalizado') return 1;
+          const dateA = new Date(a.created_at || 0).getTime();
+          const dateB = new Date(b.created_at || 0).getTime();
+          return dateB - dateA;
+        });
+        
+        setCurrentCustomerTickets(sorted);
+        setCurrentCustomerTicket(sorted[0]);
+        setCurrentCustomerReminder(null);
+        setView('customer');
+      } else if (reminder) {
+        setCurrentCustomerReminder(reminder);
+        setCurrentCustomerTicket(null);
+        setCurrentCustomerTickets([]);
+        setView('customer');
+      } else {
+        alert('No se encontró información para esa patente o teléfono.');
+      }
+    } catch (err) {
+      console.error('Error in customer search:', err);
+    }
+  };
+
+  const handleRefreshPortal = async () => {
+    const identifier = currentCustomerTicket?.id || currentCustomerReminder?.patente;
+    if (identifier) {
+      await handleCustomerSearch(identifier);
     }
   };
 
@@ -187,10 +207,12 @@ export default function App() {
     return (
       <CustomerPortal
         ticket={currentCustomerTicket}
+        allTickets={currentCustomerTickets}
         reminder={currentCustomerReminder}
         settings={settings}
         onBack={handleBackToLogin}
         onAcceptQuotation={acceptQuotation}
+        onRefresh={handleRefreshPortal}
       />
     );
   }
@@ -311,6 +333,7 @@ export default function App() {
         mechanics={mechanics}
         parts={parts}
         onUpdate={updateTicket}
+        onUploadPhoto={uploadTicketPhoto}
       />
     </Layout>
   );

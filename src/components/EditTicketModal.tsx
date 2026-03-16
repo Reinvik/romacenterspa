@@ -9,9 +9,10 @@ interface EditTicketModalProps {
     mechanics: Mechanic[];
     parts: Part[];
     onUpdate: (id: string, updates: Partial<Ticket>) => Promise<void>;
+    onUploadPhoto: (patente: string, file: File) => Promise<string>;
 }
 
-export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onUpdate }: EditTicketModalProps) {
+export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onUpdate, onUploadPhoto }: EditTicketModalProps) {
     const [notes, setNotes] = useState('');
     const [mechanicId, setMechanicId] = useState('Sin asignar');
     const [selectedParts, setSelectedParts] = useState<string[]>([]);
@@ -22,6 +23,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     const [jobPhotos, setJobPhotos] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
     useEffect(() => {
         if (ticket) {
@@ -49,6 +51,25 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     };
 
     const isFinalized = ticket?.status === 'Finalizado' || ticket?.status === 'Entregado';
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !ticket) return;
+
+        setUploading(true);
+        setUploadProgress(0);
+
+        try {
+            const publicUrl = await onUploadPhoto(ticket.id, file);
+            setJobPhotos(prev => [...prev, publicUrl]);
+        } catch (error) {
+            console.error('Upload failed:', error);
+            alert('Error al subir la imagen. Por favor intenta de nuevo.');
+        } finally {
+            setUploading(false);
+            setUploadProgress(null);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -228,7 +249,13 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                 </div>
                             ))}
                             
-                            {jobPhotos.length < 6 && !isFinalized && (
+                            {uploading && (
+                                <div className="aspect-square rounded-xl border border-zinc-200 bg-zinc-50 flex items-center justify-center">
+                                    <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+                                </div>
+                            )}
+
+                            {jobPhotos.length < 6 && !isFinalized && !uploading && (
                                 <label className="aspect-square rounded-xl border-2 border-dashed border-zinc-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all cursor-pointer flex flex-col items-center justify-center gap-1 text-zinc-400 hover:text-emerald-600">
                                     <ImagePlus className="w-6 h-6" />
                                     <span className="text-[10px] font-bold">Añadir</span>
@@ -237,16 +264,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                         accept="image/*" 
                                         capture="environment"
                                         className="hidden" 
-                                        onChange={async (e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) {
-                                                const reader = new FileReader();
-                                                reader.onloadend = () => {
-                                                    setJobPhotos(prev => [...prev, reader.result as string]);
-                                                };
-                                                reader.readAsDataURL(file);
-                                            }
-                                        }}
+                                        onChange={handleFileChange}
                                     />
                                 </label>
                             )}
@@ -263,7 +281,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                         </button>
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || uploading}
                             className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors shadow-sm disabled:opacity-50"
                         >
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}

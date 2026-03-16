@@ -2,18 +2,21 @@ import React from 'react';
 import { Ticket, TicketStatus, GarageSettings, Reminder } from '../types';
 import { parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Car, Clock, ArrowLeft, CheckCircle2, Wrench, Package, AlertCircle, MapPin, Camera, Image as ImageIcon, Calendar, Phone } from 'lucide-react';
+import { Car, Clock, ArrowLeft, CheckCircle2, Wrench, Package, AlertCircle, MapPin, Camera, Image as ImageIcon, Calendar, Phone, RotateCw, History } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface CustomerPortalProps {
   ticket: Ticket | null;
+  allTickets?: Ticket[];
   reminder: Reminder | null;
   settings: GarageSettings | null;
   onBack: () => void;
   onAcceptQuotation: (id: string, model: string) => Promise<void>;
+  onRefresh?: () => Promise<void>;
 }
 
-export function CustomerPortal({ ticket, reminder, settings, onBack, onAcceptQuotation }: CustomerPortalProps) {
+export function CustomerPortal({ ticket, allTickets = [], reminder, settings, onBack, onAcceptQuotation, onRefresh }: CustomerPortalProps) {
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [logoError, setLogoError] = React.useState(false);
 
@@ -31,7 +34,14 @@ export function CustomerPortal({ ticket, reminder, settings, onBack, onAcceptQuo
   const safeFormatDateSimplified = (dateStr: string | undefined | null) => {
     try {
       if (!dateStr) return 'N/A';
-      const date = parseISO(`${dateStr.substring(0, 10)}T00:00:00`);
+      const isoDate = dateStr.substring(0, 10);
+      const today = format(new Date(), 'yyyy-MM-dd');
+
+      if (isoDate === today) {
+        return 'Hoy';
+      }
+
+      const date = parseISO(`${isoDate}T00:00:00`);
       return format(date, "dd/MM/yyyy");
     } catch (e) {
       return 'Fecha inválida';
@@ -191,7 +201,24 @@ export function CustomerPortal({ ticket, reminder, settings, onBack, onAcceptQuo
 
         <div className="bg-white rounded-3xl shadow-xl border border-zinc-100 overflow-hidden">
           {/* Header */}
-          <div className="bg-zinc-900 p-8 text-white flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="bg-zinc-900 p-8 text-white flex flex-col md:flex-row md:items-center justify-between gap-6 relative">
+            {onRefresh && (
+              <button
+                onClick={async () => {
+                  setIsRefreshing(true);
+                  try {
+                    await onRefresh();
+                  } finally {
+                    setIsRefreshing(false);
+                  }
+                }}
+                disabled={isRefreshing}
+                className="absolute top-4 right-4 p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full transition-all active:scale-95 disabled:opacity-50"
+                title="Actualizar estado"
+              >
+                <RotateCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
+              </button>
+            )}
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center">
@@ -205,7 +232,7 @@ export function CustomerPortal({ ticket, reminder, settings, onBack, onAcceptQuo
             </div>
 
             <div className="bg-zinc-800/50 p-4 rounded-2xl border border-zinc-700/50 min-w-[200px]">
-              <p className="text-xs text-zinc-400 font-medium uppercase tracking-wider mb-1 text-center md:text-left">Estado Actual</p>
+              <p className="text-xs text-zinc-400 font-medium uppercase tracking-wider mb-1 text-center md:text-left">Reporte Actual</p>
               <p className="text-xl font-bold flex items-center justify-center md:justify-start gap-2" style={{ color: primaryColor }}>
                 {ticket.status === 'Finalizado' ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
                 {ticket.status}
@@ -213,12 +240,16 @@ export function CustomerPortal({ ticket, reminder, settings, onBack, onAcceptQuo
             </div>
           </div>
 
-          {/* Content */}
+          {/* Report Content */}
           <div className="p-8">
-            <h3 className="text-lg font-bold text-zinc-900 mb-6">Progreso de la Reparación</h3>
-
-            {/* Timeline */}
+            <h3 className="text-lg font-bold text-zinc-900 mb-6 uppercase tracking-tight flex items-center gap-2">
+              <History className="w-5 h-5 text-zinc-400" />
+              Estado del Reporte
+            </h3>
+            
+            {/* ... Rest of the existing ticket content ... */}
             <div className="relative mb-12">
+              {/* (Existing Timeline UI) */}
               <div className="absolute top-1/2 left-0 w-full h-1 bg-zinc-100 -translate-y-1/2 rounded-full"></div>
               <div
                 className="absolute top-1/2 left-0 h-1 -translate-y-1/2 rounded-full transition-all duration-500"
@@ -234,7 +265,7 @@ export function CustomerPortal({ ticket, reminder, settings, onBack, onAcceptQuo
                   const isCurrent = index === currentIndex;
 
                   return (
-                    <div key={status} className="flex flex-col items-center gap-3 w-24">
+                    <div key={status} className="flex flex-col items-center gap-3 w-20 md:w-24">
                       <div className={cn(
                         "w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors z-10 bg-white",
                         isCompleted ? "z-20" : "border-zinc-200 text-zinc-300"
@@ -247,7 +278,7 @@ export function CustomerPortal({ ticket, reminder, settings, onBack, onAcceptQuo
                         {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <div className="w-2.5 h-2.5 rounded-full bg-current"></div>}
                       </div>
                       <span className={cn(
-                        "text-xs font-semibold text-center leading-tight",
+                        "text-[10px] md:text-xs font-semibold text-center leading-tight",
                         isCurrent ? "font-bold" : (isCompleted ? "text-zinc-700" : "text-zinc-400")
                       )} style={{ color: isCurrent ? primaryColor : undefined }}>
                         {status}
@@ -262,21 +293,21 @@ export function CustomerPortal({ ticket, reminder, settings, onBack, onAcceptQuo
               <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100">
                 <div className="flex items-center gap-2 mb-4 text-zinc-900 font-bold">
                   <Wrench className="w-5 h-5 text-zinc-500" />
-                  Detalles del Ingreso
+                  Observaciones Técnicas
                 </div>
                 <p className="text-sm text-zinc-600 mb-4 leading-relaxed">
                   {ticket.notes}
                 </p>
                 <div className="text-xs text-zinc-500 font-medium flex items-center gap-1.5">
                   <Clock className="w-4 h-4" />
-                  Ingresado el {safeFormatDate(ticket.entry_date)}
+                  Apertura: {safeFormatDate(ticket.entry_date)}
                 </div>
               </div>
 
               <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100">
                 <div className="flex items-center gap-2 mb-4 text-zinc-900 font-bold">
                   <Package className="w-5 h-5 text-zinc-500" />
-                  Repuestos Necesarios
+                  Repuestos Aplicados
                 </div>
                 {ticket.parts_needed && ticket.parts_needed.length > 0 ? (
                   <ul className="space-y-2">
@@ -289,19 +320,48 @@ export function CustomerPortal({ ticket, reminder, settings, onBack, onAcceptQuo
                   </ul>
                 ) : (
                   <p className="text-sm text-zinc-500 italic">
-                    Aún no se han definido repuestos o no son necesarios.
+                    Sin repuestos registrados.
                   </p>
                 )}
               </div>
             </div>
 
-            {/* Quotation Section */}
+            {/* Evidencia Fotográfica (Keep existing) */}
+            {ticket.job_photos && ticket.job_photos.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden mt-6">
+                <div className="p-4 border-b border-zinc-50 flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-emerald-500" />
+                  <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-tight">Evidencia Fotográfica</h3>
+                </div>
+                <div className="p-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {ticket.job_photos.map((photo, index) => (
+                      <a 
+                        key={index} 
+                        href={photo} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="aspect-square rounded-xl overflow-hidden border border-zinc-100 bg-zinc-50 group transition-all hover:ring-2 hover:ring-emerald-500/20"
+                      >
+                        <img 
+                          src={photo} 
+                          alt={`Evidencia ${index + 1}`} 
+                          className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Quotation (Keep existing) */}
             {ticket.status === 'En Espera' && ticket.quotation_total !== undefined && ticket.quotation_total > 0 && (
               <div className="mt-8 p-8 rounded-3xl border-2 flex flex-col md:flex-row items-center justify-between gap-6" 
                    style={{ backgroundColor: primaryBg, borderColor: `${primaryColor}20` }}>
                 <div className="text-center md:text-left">
                   <h4 className="font-bold text-xl mb-1" style={{ color: primaryColor }}>Cotización del Servicio</h4>
-                  <p className="font-medium text-zinc-600">El diagnóstico está listo. Puedes autorizar el trabajo ahora.</p>
+                  <p className="font-medium text-zinc-600">Diagnóstico listo para autorización.</p>
                 </div>
                 <div className="flex flex-col items-center md:items-end gap-3">
                   <div className="text-3xl font-black" style={{ color: primaryColor }}>
@@ -311,7 +371,7 @@ export function CustomerPortal({ ticket, reminder, settings, onBack, onAcceptQuo
                     <div className="flex items-center gap-2 font-bold bg-white px-4 py-2 rounded-xl border shadow-sm"
                          style={{ color: primaryColor, borderColor: `${primaryColor}30` }}>
                       <CheckCircle2 className="w-5 h-5" />
-                      Cotización Aceptada
+                      Aceptada
                     </div>
                   ) : (
                     <button
@@ -327,17 +387,8 @@ export function CustomerPortal({ ticket, reminder, settings, onBack, onAcceptQuo
                       className="w-full md:w-auto px-8 py-3 text-white rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
                       style={{ backgroundColor: primaryColor, boxShadow: `0 10px 15px -3px ${primaryColor}40` }}
                     >
-                      {loading ? (
-                        <>
-                          <Clock className="w-5 h-5 animate-spin" />
-                          Procesando...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-5 h-5" />
-                          Aceptar y Comenzar Reparación
-                        </>
-                      )}
+                      {loading ? <Clock className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                      Aceptar
                     </button>
                   )}
                 </div>
@@ -345,6 +396,48 @@ export function CustomerPortal({ ticket, reminder, settings, onBack, onAcceptQuo
             )}
           </div>
         </div>
+
+        {/* Historial de Reportes Antiguos */}
+        {allTickets.length > 1 && (
+          <div className="mt-12">
+            <h3 className="text-lg font-black text-zinc-900 mb-6 uppercase tracking-widest flex items-center gap-2 px-2">
+              <History className="w-5 h-5 text-zinc-400" />
+              Historial de Reportes Anteriores
+            </h3>
+            <div className="space-y-4">
+              {allTickets.slice(1).map((histTicket, idx) => (
+                <div key={idx} className="bg-white p-6 rounded-2xl border border-zinc-100 shadow-sm hover:shadow-md transition-shadow group">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-zinc-50 rounded-xl flex items-center justify-center border border-zinc-100 group-hover:bg-zinc-100 transition-colors">
+                        <ImageIcon className="w-6 h-6 text-zinc-400" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-zinc-900 leading-tight">Servicio de {safeFormatDate(histTicket.entry_date)}</h4>
+                        <p className="text-xs text-zinc-500 font-medium">Estado: {histTicket.status}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       {histTicket.cost && (
+                         <div className="px-3 py-1 bg-zinc-50 border border-zinc-100 rounded-lg text-sm font-bold text-zinc-900">
+                           ${histTicket.cost.toLocaleString('es-CL')}
+                         </div>
+                       )}
+                       <div className="p-2 border border-zinc-100 rounded-lg text-zinc-400 group-hover:text-zinc-900 transition-colors">
+                         <AlertCircle className="w-4 h-4" />
+                       </div>
+                    </div>
+                  </div>
+                  {histTicket.notes && (
+                    <div className="mt-4 pt-4 border-t border-zinc-50">
+                      <p className="text-xs text-zinc-600 line-clamp-2 italic leading-relaxed">"{histTicket.notes}"</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

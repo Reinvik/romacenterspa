@@ -12,10 +12,10 @@ export function useGarageStore(companyId?: string) {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<GarageSettings | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isSilent = false) => {
     if (!companyId) return;
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
 
       const [
         { data: ticketsData },
@@ -77,13 +77,13 @@ export function useGarageStore(companyId?: string) {
 
     // Suscribirse a cambios en tiempo real
     const channels = [
-      supabase.channel('garage_tickets_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_tickets' }, () => fetchData()).subscribe(),
-      supabase.channel('garage_mechanics_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_mechanics' }, () => fetchData()).subscribe(),
-      supabase.channel('garage_parts_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_parts' }, () => fetchData()).subscribe(),
-      supabase.channel('garage_customers_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_customers' }, () => fetchData()).subscribe(),
-      supabase.channel('garage_settings_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_settings' }, () => fetchData()).subscribe(),
-      supabase.channel('garage_reminders_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_reminders' }, () => fetchData()).subscribe(),
-      supabase.channel('garage_notifications_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_notifications' }, () => fetchData()).subscribe(),
+      supabase.channel('garage_tickets_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_tickets' }, () => fetchData(true)).subscribe(),
+      supabase.channel('garage_mechanics_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_mechanics' }, () => fetchData(true)).subscribe(),
+      supabase.channel('garage_parts_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_parts' }, () => fetchData(true)).subscribe(),
+      supabase.channel('garage_customers_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_customers' }, () => fetchData(true)).subscribe(),
+      supabase.channel('garage_settings_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_settings' }, () => fetchData(true)).subscribe(),
+      supabase.channel('garage_reminders_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_reminders' }, () => fetchData(true)).subscribe(),
+      supabase.channel('garage_notifications_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_notifications' }, () => fetchData(true)).subscribe(),
     ];
 
     return () => {
@@ -413,6 +413,7 @@ export function useGarageStore(companyId?: string) {
       if (updates.vin !== undefined) dbUpdates.vin = updates.vin;
       if (updates.engine_id !== undefined) dbUpdates.engine_id = updates.engine_id;
       if (updates.mileage !== undefined) dbUpdates.mileage = updates.mileage;
+      if (updates.job_photos !== undefined) dbUpdates.job_photos = updates.job_photos;
 
       if (updates.mechanic_id !== undefined) {
         dbUpdates.mechanic = updates.mechanic_id === 'Sin asignar' ? null : updates.mechanic_id;
@@ -571,6 +572,33 @@ export function useGarageStore(companyId?: string) {
     }
   };
 
+  const uploadTicketPhoto = async (patente: string, file: File): Promise<string> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${patente}/${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('ticket-photos')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      // Obtener URL pública
+      const { data: { publicUrl } } = supabase.storage
+        .from('ticket-photos')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      throw error;
+    }
+  };
+
   return {
     tickets,
     mechanics,
@@ -592,6 +620,7 @@ export function useGarageStore(companyId?: string) {
     updateSettings,
     updateTicket,
     deleteTicket,
+    uploadTicketPhoto,
     updateVehicle: async (patente: string, updates: { ownerName?: string; ownerPhone?: string; model?: string }) => {
       try {
         // Encontrar el último ticket de esta patente para obtener su ID real de base de datos
@@ -668,6 +697,27 @@ export function useGarageStore(companyId?: string) {
       }]);
     },
     searchTicket,
+    searchTicketsHistory: async (patente: string): Promise<Ticket[]> => {
+      const normalizedInput = patente.replace(/[\s\.\-·]/g, '').toUpperCase();
+      if (!companyId) return [];
+      try {
+        const { data, error } = await supabaseGarage
+          .from('garage_tickets')
+          .select('*')
+          .eq('company_id', companyId)
+          .eq('id', normalizedInput)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        return (data || []).map(d => {
+           const mech = mechanics.find(m => m.id === d.mechanic || m.name.toUpperCase() === (d.mechanic || '').toUpperCase());
+           return { ...d, mechanic: mech?.name || d.mechanic || 'Sin asignar' };
+        });
+      } catch (e) {
+        console.error('Error in searchTicketsHistory:', e);
+        return [];
+      }
+    },
     fetchActiveReminder: async (patente: string): Promise<Reminder | null> => {
       if (!companyId) return null;
       try {

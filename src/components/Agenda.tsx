@@ -160,7 +160,14 @@ export function Agenda({
     const safeFormatDateReminders = (dateStr: string) => {
         try {
             if (!dateStr) return 'N/A';
-            const date = parseISO(`${dateStr.substring(0, 10)}T00:00:00`);
+            const isoDate = dateStr.substring(0, 10);
+            const today = format(new Date(), 'yyyy-MM-dd');
+            
+            if (isoDate === today) {
+                return 'Hoy';
+            }
+
+            const date = parseISO(`${isoDate}T00:00:00`);
             return format(date, "EEEE d 'de' MMMM", { locale: es });
         } catch (e) {
             return 'Fecha inválida';

@@ -46,6 +46,7 @@ export interface Ticket {
   service_log?: ServiceLogEntry[];
   vehicle_notes?: string;
   job_photos?: string[];
+  created_at?: string;
 }
 
 export interface Mechanic {
