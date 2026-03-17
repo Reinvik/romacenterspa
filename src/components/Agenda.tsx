@@ -53,7 +53,7 @@ export function Agenda({
     updateReminder,
     deleteReminder
 }: AgendaProps) {
-    const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+    const [viewMode, setViewMode] = useState<'calendar' | 'list' | 'preventive'>('calendar');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -66,6 +66,39 @@ export function Agenda({
         planned_date: new Date().toISOString(),
         completed: false
     });
+
+    // Lógica para Mantenimientos Preventivos (8-9 meses)
+    const preventiveTickets = useMemo(() => {
+        const now = new Date();
+        const minDate = subMonths(now, 10);
+        const maxDate = subMonths(now, 6);
+
+        // Agrupar por patente para tener solo el servicio más reciente
+        const latestByPatente: Record<string, Ticket> = {};
+
+        tickets.forEach(ticket => {
+            if (!ticket.close_date) return;
+            
+            const closeDate = parseISO(ticket.close_date);
+            const isFinished = ticket.status === 'Finalizado' || ticket.status === 'Entregado';
+            const isInRange = closeDate >= minDate && closeDate <= maxDate;
+
+            if (isFinished && isInRange) {
+                const searchContent = `${ticket.notes || ''} ${ticket.services?.map(s => s.descripcion).join(' ') || ''}`.toLowerCase();
+                const isLubricant = searchContent.includes('aceite') || searchContent.includes('lubricante');
+
+                if (isLubricant) {
+                    if (!latestByPatente[ticket.id] || parseISO(latestByPatente[ticket.id].close_date!) < closeDate) {
+                        latestByPatente[ticket.id] = ticket;
+                    }
+                }
+            }
+        });
+
+        return Object.values(latestByPatente).sort((a, b) => 
+            parseISO(b.close_date!).getTime() - parseISO(a.close_date!).getTime()
+        );
+    }, [tickets]);
 
     // Lógica de Calendario
     const days = useMemo(() => {
@@ -157,6 +190,15 @@ export function Agenda({
         }
     };
 
+    const sendPreventiveWhatsApp = (ticket: Ticket) => {
+        try {
+            const message = `Hola ${ticket.owner_name}, te escribimos de ${settings?.workshop_name || 'Roma Center SPA'} para recordarte que ya han pasado 8 meses desde el último cambio de aceite/lubricante para tu vehículo ${ticket.model} (${ticket.id}). ¿Te gustaría agendar una mantención preventiva para mantenerlo en óptimas condiciones?`;
+            window.open(`https://wa.me/${ticket.owner_phone}?text=${encodeURIComponent(message)}`, '_blank');
+        } catch (e) {
+            console.error('Error opening WhatsApp:', e);
+        }
+    };
+
     const safeFormatDateReminders = (dateStr: string) => {
         try {
             if (!dateStr) return 'N/A';
@@ -201,9 +243,21 @@ export function Agenda({
                         )}
                     >
                         Lista de Pendientes
-                        {pendingReminders.length > 0 && (
-                            <span className="bg-emerald-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                                {pendingReminders.length}
+                        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-white">
+                            {pendingReminders.length}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setViewMode('preventive')}
+                        className={cn(
+                            "px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2",
+                            viewMode === 'preventive' ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+                        )}
+                    >
+                        Preventivos (8-9 meses)
+                        {preventiveTickets.length > 0 && (
+                            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                                {preventiveTickets.length}
                             </span>
                         )}
                     </button>
@@ -280,6 +334,77 @@ export function Agenda({
                                         >
                                             <Send className="w-3.5 h-3.5" />
                                             Confirmar WhatsApp
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : viewMode === 'preventive' ? (
+                <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-zinc-50 bg-zinc-50/30 flex justify-between items-center">
+                        <div>
+                            <h3 className="text-lg font-black text-zinc-900 uppercase tracking-tight">Mantenimientos Preventivos Sugeridos</h3>
+                            <p className="text-xs text-zinc-500">Clientes que realizaron cambio de aceite o lubricante hace 8-9 meses.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-zinc-400">Total Detectados:</span>
+                            <span className="text-sm font-black text-zinc-900 bg-white px-3 py-1 rounded-xl border border-zinc-100 shadow-sm">
+                                {preventiveTickets.length}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="p-6">
+                        {preventiveTickets.length === 0 ? (
+                            <div className="py-20 text-center">
+                                <div className="w-20 h-20 bg-zinc-50 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-zinc-100 border-dashed">
+                                    <Clock className="w-10 h-10 text-zinc-200" />
+                                </div>
+                                <h4 className="text-zinc-900 font-bold mb-1">No se detectaron mantenimientos próximos</h4>
+                                <p className="text-zinc-500 text-sm max-w-sm mx-auto">
+                                    Aquí aparecerán automáticamente los clientes que necesitan un recordatorio de cambio de aceite basado en su historial de hace 8 meses.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {preventiveTickets.map(ticket => (
+                                    <div key={ticket.id} className="bg-white p-5 rounded-3xl border border-zinc-200 hover:border-emerald-500 transition-all shadow-sm group">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Último Servicio</span>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs font-bold text-zinc-600 bg-zinc-50 px-2 py-0.5 rounded-lg border border-zinc-100 flex items-center gap-1">
+                                                        {ticket.close_date ? format(parseISO(ticket.close_date), 'dd/MM/yyyy') : 'N/A'}
+                                                    </span>
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg border bg-rose-50 text-rose-600 border-rose-100">
+                                                        Hace {Math.floor((new Date().getTime() - parseISO(ticket.close_date!).getTime()) / (1000 * 60 * 60 * 24 * 30))} meses
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="mb-4">
+                                            <h4 className="font-black text-zinc-900 truncate">{ticket.owner_name}</h4>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className="text-[10px] font-mono font-black text-white bg-zinc-900 px-1.5 py-0.5 rounded uppercase">
+                                                    {ticket.id}
+                                                </span>
+                                                <span className="text-xs text-zinc-500 font-medium truncate">{ticket.model}</span>
+                                            </div>
+                                            {ticket.mileage && (
+                                                <div className="mt-2 flex items-center gap-1 text-[10px] text-zinc-400 font-bold uppercase tracking-tight">
+                                                    Km registrado: {ticket.mileage.toLocaleString()} KM
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <button
+                                            onClick={() => sendPreventiveWhatsApp(ticket)}
+                                            className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-[11px] transition-all shadow-lg shadow-emerald-500/20 uppercase tracking-wider"
+                                        >
+                                            <Send className="w-4 h-4" />
+                                            Enviar Recordatorio
                                         </button>
                                     </div>
                                 ))}

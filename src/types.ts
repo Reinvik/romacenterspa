@@ -22,6 +22,11 @@ export interface ServiceLogEntry {
   job_photos?: string[];
 }
 
+export interface ServiceItem {
+  descripcion: string;
+  costo: number;
+}
+
 export interface Ticket {
   id: string; // Patente
   model: string;
@@ -46,6 +51,7 @@ export interface Ticket {
   service_log?: ServiceLogEntry[];
   vehicle_notes?: string;
   job_photos?: string[];
+  services?: ServiceItem[];
   created_at?: string;
 }
 

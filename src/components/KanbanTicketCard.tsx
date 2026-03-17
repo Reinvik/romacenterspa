@@ -98,15 +98,6 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
         </div>
         
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          {onShowHistory && (
-            <button
-              onClick={() => onShowHistory(ticket)}
-              className="text-zinc-400 hover:text-blue-600 p-1 hover:bg-zinc-100 rounded-lg transition-colors"
-              title="Ver Trazabilidad"
-            >
-              <Clock className="w-4 h-4" />
-            </button>
-          )}
           {ticket.status !== 'Finalizado' && (
             <button
               onClick={() => onEdit(ticket)}

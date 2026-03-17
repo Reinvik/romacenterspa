@@ -69,7 +69,6 @@ export function VehicleCRMModal({ isOpen, onClose, ticket, onUpdateNotes, settin
               <p className="text-zinc-400 font-medium text-lg">{ticket.model}</p>
               <div className="flex items-center gap-4 mt-3 text-sm text-zinc-500 font-medium">
                 <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Primer ingreso: {format(parseISO(firstVisitDate), "MMM yyyy", { locale: es })}</span>
-                {ticket.vin && <span className="flex items-center gap-1.5"><Tag className="w-4 h-4" /> VIN: {ticket.vin}</span>}
               </div>
             </div>
           </div>

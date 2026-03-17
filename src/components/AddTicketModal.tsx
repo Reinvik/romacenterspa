@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Mechanic, TicketStatus, Customer, Ticket, GarageSettings } from '../types';
-import { X, Search, Info, UserPlus, History } from 'lucide-react';
+import { Mechanic, TicketStatus, Customer, Ticket, GarageSettings, ServiceItem } from '../types';
+import { X, Search, Info, UserPlus, History, PlusCircle, Trash2 } from 'lucide-react';
 import { CAR_BRANDS, CAR_MODELS } from '../lib/carData';
 
 interface AddTicketModalProps {
@@ -23,10 +23,9 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     owner_name: '',
     owner_phone: '',
     notes: '',
-    vin: '',
-    engine_id: '',
     mileage: 0,
     entry_date: format(new Date(), 'yyyy-MM-dd'),
+    services: [{ descripcion: '', costo: 0 }] as ServiceItem[],
   });
 
   const [brandSearch, setBrandSearch] = useState('');
@@ -94,8 +93,6 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
       id: ('vehicles' in customer ? customer.vehicles?.[0] : customer.id) || prev.id,
       owner_name: 'name' in customer ? customer.name : customer.owner_name,
       owner_phone: 'phone' in customer ? customer.phone : customer.owner_phone,
-      vin: ('last_vin' in customer ? customer.last_vin : (customer as Ticket).vin) || prev.vin,
-      engine_id: ('last_engine_id' in customer ? customer.last_engine_id : (customer as Ticket).engine_id) || prev.engine_id,
       mileage: ('last_mileage' in customer ? customer.last_mileage : (customer as Ticket).mileage) || prev.mileage,
       model: ('last_model' in customer ? customer.last_model : (customer as Ticket).model) || prev.model
     }));
@@ -133,12 +130,37 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
       owner_name: '',
       owner_phone: '',
       notes: '',
-      vin: '',
-      engine_id: '',
       mileage: 0,
       entry_date: format(new Date(), 'yyyy-MM-dd'),
+      services: [{ descripcion: '', costo: 0 }],
     });
   };
+
+  const handleAddService = () => {
+    setFormData(prev => ({
+      ...prev,
+      services: [...prev.services, { descripcion: '', costo: 0 }]
+    }));
+  };
+
+  const handleRemoveService = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      services: prev.services.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleServiceChange = (index: number, field: keyof ServiceItem, value: string | number) => {
+    const newServices = [...formData.services];
+    if (field === 'costo') {
+      newServices[index][field] = Number(value);
+    } else {
+      newServices[index][field] = value as string;
+    }
+    setFormData(prev => ({ ...prev, services: newServices }));
+  };
+
+  const totalServicesCost = formData.services.reduce((acc, curr) => acc + (curr.costo || 0), 0);
 
   return (
     <div className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -297,35 +319,7 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
               <h3 className="text-sm font-black text-zinc-900 uppercase tracking-widest">Especificaciones Técnicas</h3>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">N° Chasis (VIN)</label>
-                <input
-                  type="text"
-                  placeholder="17 caracteres..."
-                  className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none transition-all font-mono text-sm uppercase bg-zinc-50/30 focus:ring-4"
-                  style={{ 
-                    borderColor: formData.vin ? primaryColor : undefined,
-                    boxShadow: formData.vin ? `0 0 0 4px ${primaryColor}15` : undefined
-                  }}
-                  value={formData.vin}
-                  onChange={e => setFormData({ ...formData, vin: e.target.value.toUpperCase() })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">N° Motor</label>
-                <input
-                  type="text"
-                  placeholder="ID del motor..."
-                  className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none transition-all font-mono text-sm uppercase bg-zinc-50/30 focus:ring-4"
-                  style={{ 
-                    borderColor: formData.engine_id ? primaryColor : undefined,
-                    boxShadow: formData.engine_id ? `0 0 0 4px ${primaryColor}15` : undefined
-                  }}
-                  value={formData.engine_id}
-                  onChange={e => setFormData({ ...formData, engine_id: e.target.value.toUpperCase() })}
-                />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Kilometraje (KM)</label>
                 <div className="relative">
@@ -399,16 +393,103 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Observaciones / Motivo Ingreso</label>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-1 h-6 rounded-full" style={{ backgroundColor: primaryColor }}></div>
+              <h3 className="text-base font-black text-zinc-900 uppercase tracking-widest">Observaciones de Ingreso</h3>
+            </div>
             <textarea
-              required
-              rows={3}
-              placeholder="Describe el síntoma o el trabajo solicitado..."
-              className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all resize-none font-medium"
+              rows={2}
+              placeholder="Notas adicionales o motivo de ingreso..."
+              className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all resize-none font-medium text-sm"
               value={formData.notes}
               onChange={e => setFormData({ ...formData, notes: e.target.value })}
             />
+          </div>
+
+          {/* Lista Dinámica de Servicios */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-50 pb-1">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-4 bg-emerald-500 rounded-full"></div>
+                <h3 className="text-sm font-black text-zinc-900 uppercase tracking-widest">Servicios y Costos Iniciales</h3>
+              </div>
+              <div className="flex gap-2">
+                {[
+                  { label: "Cambio Aceite + Filtro", desc: "Cambio de Aceite + Filtro de Aceite", price: 0 },
+                  { label: "Lubricación General", desc: "Lubricación de chasis y puntos", price: 0 }
+                ].map((action, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      const newService = { descripcion: action.desc, costo: action.price };
+                      if (formData.services.length === 1 && !formData.services[0].descripcion) {
+                        setFormData({ ...formData, services: [newService] });
+                      } else {
+                        setFormData({ ...formData, services: [...formData.services, newService] });
+                      }
+                    }}
+                    className="text-[9px] font-black uppercase px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all"
+                  >
+                    + {action.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              {formData.services.map((service, index) => (
+                <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-7">
+                    <input
+                      type="text"
+                      placeholder="Descripción del servicio"
+                      className="w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-emerald-500 outline-none transition-all text-sm bg-white"
+                      value={service.descripcion}
+                      onChange={(e) => handleServiceChange(index, 'descripcion', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-4 relative">
+                    <input
+                      type="number"
+                      placeholder="Costo"
+                      className="w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-emerald-500 outline-none transition-all text-sm font-bold pl-5 bg-white"
+                      value={service.costo || ''}
+                      onChange={(e) => handleServiceChange(index, 'costo', e.target.value)}
+                    />
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400">$</span>
+                  </div>
+                  <div className="col-span-1 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveService(index)}
+                      className="p-1.5 text-zinc-300 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAddService}
+              className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors py-1"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Agregar otro servicio
+            </button>
+
+            <div className="pt-2 flex justify-end">
+              <div className="bg-zinc-50 px-4 py-2 rounded-xl border border-zinc-100 flex items-center gap-3">
+                <span className="text-[10px] font-black text-zinc-400 uppercase">Total Estimado</span>
+                <span className="text-sm font-black text-emerald-600">
+                  ${totalServicesCost.toLocaleString('es-CL')}
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t border-zinc-100">

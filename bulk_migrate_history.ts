@@ -10,7 +10,7 @@ const SUPABASE_KEY = 'sb_publishable_Gu-Ms46DKjORMc5KY-lamA_TwbnIalu';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const filePath = 'C:/Proyectos/Romacenterspa/HISTORIAL VEHICULOS.xlsb.xlsx';
-const COMPANY_ID = 'e7f8c91b-d532-4540-8a46-891f2f30a1d6';
+const COMPANY_ID = '42dfd0fc-8894-4dd1-bc1a-c685633f02d8';
 
 const targetSheets = [
   '2022nOVIEMBRE-DICIEMBRE -ENERO',

@@ -203,7 +203,8 @@ export function useGarageStore(companyId?: string) {
           last_status_change: new Date().toISOString(),
           vin: ticket.vin,
           engine_id: ticket.engine_id,
-          mileage: ticket.mileage
+          mileage: ticket.mileage,
+          services: ticket.services || []
         }]);
 
         if (error) throw error;
@@ -414,6 +415,7 @@ export function useGarageStore(companyId?: string) {
       if (updates.engine_id !== undefined) dbUpdates.engine_id = updates.engine_id;
       if (updates.mileage !== undefined) dbUpdates.mileage = updates.mileage;
       if (updates.job_photos !== undefined) dbUpdates.job_photos = updates.job_photos;
+      if (updates.services !== undefined) dbUpdates.services = updates.services;
 
       if (updates.mechanic_id !== undefined) {
         dbUpdates.mechanic = updates.mechanic_id === 'Sin asignar' ? null : updates.mechanic_id;

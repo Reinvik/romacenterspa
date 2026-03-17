@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Ticket, Mechanic, Part } from '../types';
-import { X, Save, User, FileText, Loader2, Package, Trash2, Plus, CheckCircle2, Camera, Image as ImageIcon, ImagePlus } from 'lucide-react';
+import { Ticket, Mechanic, Part, ServiceItem } from '../types';
+import { X, Save, User, FileText, Loader2, Package, Trash2, Plus, CheckCircle2, Camera, Image as ImageIcon, ImagePlus, PlusCircle } from 'lucide-react';
 
 interface EditTicketModalProps {
     isOpen: boolean;
@@ -17,10 +17,9 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     const [mechanicId, setMechanicId] = useState('Sin asignar');
     const [selectedParts, setSelectedParts] = useState<string[]>([]);
     const [quotationTotal, setQuotationTotal] = useState<number>(0);
-    const [vin, setVin] = useState('');
-    const [engineId, setEngineId] = useState('');
     const [mileage, setMileage] = useState<number>(0);
     const [jobPhotos, setJobPhotos] = useState<string[]>([]);
+    const [services, setServices] = useState<ServiceItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -31,10 +30,9 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
             setMechanicId(ticket.mechanic_id || 'Sin asignar');
             setSelectedParts(ticket.parts_needed || []);
             setQuotationTotal(ticket.quotation_total || 0);
-            setVin(ticket.vin || '');
-            setEngineId(ticket.engine_id || '');
             setMileage(ticket.mileage || 0);
             setJobPhotos(ticket.job_photos || []);
+            setServices(ticket.services || [{ descripcion: '', costo: 0 }]);
         }
     }, [ticket]);
 
@@ -51,6 +49,26 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     };
 
     const isFinalized = ticket?.status === 'Finalizado' || ticket?.status === 'Entregado';
+
+    const handleAddService = () => {
+        setServices([...services, { descripcion: '', costo: 0 }]);
+    };
+
+    const handleRemoveService = (index: number) => {
+        setServices(services.filter((_, i) => i !== index));
+    };
+
+    const handleServiceChange = (index: number, field: keyof ServiceItem, value: string | number) => {
+        const newServices = [...services];
+        if (field === 'costo') {
+            newServices[index][field] = Number(value);
+        } else if (field === 'descripcion') {
+            newServices[index][field] = value as string;
+        }
+        setServices(newServices);
+    };
+
+    const totalServicesCost = services.reduce((acc, curr) => acc + (curr.costo || 0), 0);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -80,11 +98,10 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                 notes,
                 mechanic_id: mechanicId === 'Sin asignar' ? null : mechanicId,
                 parts_needed: selectedParts,
-                quotation_total: quotationTotal,
-                vin,
-                engine_id: engineId,
+                quotation_total: totalServicesCost > 0 ? totalServicesCost : quotationTotal,
                 mileage,
-                job_photos: jobPhotos
+                job_photos: jobPhotos,
+                services: services
             });
             onClose();
         } catch (error) {
@@ -95,8 +112,8 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     };
 
     return (
-        <div className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-sans">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-sans overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col my-auto max-h-[90vh]">
                 <div className="flex justify-between items-center p-6 border-b border-zinc-100">
                     <div className="flex flex-col">
                         <span className="text-xs font-mono font-bold text-zinc-500 mb-0.5">{ticket.id}</span>
@@ -109,60 +126,120 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
-                    {/* Ficha Técnica */}
-                    <div className="space-y-4">
-                        <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b border-zinc-50 pb-1">Ficha Técnica</p>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">N° Chasis</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-emerald-500 outline-none transition-all font-mono text-xs uppercase bg-zinc-50/50 disabled:opacity-50"
-                                    value={vin}
-                                    onChange={e => setVin(e.target.value.toUpperCase())}
-                                    disabled={isFinalized}
-                                />
+                <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto flex-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                        {/* Ficha Técnica */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="w-1 h-5 rounded-full bg-blue-500"></div>
+                                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Ficha Técnica</p>
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">N° Motor</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-emerald-500 outline-none transition-all font-mono text-xs uppercase bg-zinc-50/50 disabled:opacity-50"
-                                    value={engineId}
-                                    onChange={e => setEngineId(e.target.value.toUpperCase())}
-                                    disabled={isFinalized}
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Kilometraje Actual</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 outline-none transition-all font-bold text-sm pr-10 bg-zinc-50/50 disabled:opacity-50 focus:ring-4 focus:ring-emerald-500/10"
+                                            value={mileage}
+                                            onChange={e => setMileage(Number(e.target.value))}
+                                            disabled={isFinalized}
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-zinc-400">KM</span>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Próximo Cambio Sugerido</label>
+                                    <div className="w-full px-3 py-2.5 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/30 flex items-center justify-between">
+                                        <span className="text-sm font-black text-emerald-700">
+                                            {mileage > 0 ? (mileage + 10000).toLocaleString('es-CL') : '---'}
+                                        </span>
+                                        <span className="text-[9px] font-black text-emerald-500 uppercase">+10.000 KM</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Kilometraje Actual</label>
-                            <div className="relative">
-                                <input
-                                    type="number"
-                                    className="w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-emerald-500 outline-none transition-all font-bold text-xs pr-10 bg-zinc-50/50 disabled:opacity-50"
-                                    value={mileage}
-                                    onChange={e => setMileage(Number(e.target.value))}
-                                    disabled={isFinalized}
-                                />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-zinc-400">KM</span>
+
+                        {/* Diagnóstico / Notas */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="w-1 h-5 rounded-full bg-amber-500"></div>
+                                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Diagnóstico / Notas</p>
                             </div>
+                            <textarea
+                                rows={2}
+                                className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all resize-none text-zinc-800 text-sm disabled:bg-zinc-100 disabled:text-zinc-500 font-medium"
+                                placeholder="Notas adicionales..."
+                                value={notes}
+                                onChange={e => setNotes(e.target.value)}
+                                disabled={isFinalized}
+                            />
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-semibold text-zinc-700 flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-zinc-400" />
-                            Diagnóstico / Notas
-                        </label>
-                        <textarea
-                            required
-                            rows={3}
-                            className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all resize-none text-zinc-800 text-sm disabled:bg-zinc-100 disabled:text-zinc-500"
-                            value={notes}
-                            onChange={e => setNotes(e.target.value)}
-                            disabled={isFinalized}
-                        />
+                    {/* Lista Dinámica de Servicios */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-zinc-50 pb-1">
+                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Servicios y Costos</p>
+                        </div>
+                        
+                        <div className="space-y-3">
+                            {services.map((service, index) => (
+                                <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                                    <div className="col-span-7">
+                                        <input
+                                            type="text"
+                                            placeholder="Descripción del servicio"
+                                            className="w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-emerald-500 outline-none transition-all text-xs bg-white disabled:opacity-50"
+                                            value={service.descripcion}
+                                            onChange={(e) => handleServiceChange(index, 'descripcion', e.target.value)}
+                                            disabled={isFinalized}
+                                        />
+                                    </div>
+                                    <div className="col-span-4 relative">
+                                        <input
+                                            type="number"
+                                            placeholder="Costo"
+                                            className="w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-emerald-500 outline-none transition-all text-xs font-bold pl-5 bg-white disabled:opacity-50"
+                                            value={service.costo || ''}
+                                            onChange={(e) => handleServiceChange(index, 'costo', e.target.value)}
+                                            disabled={isFinalized}
+                                        />
+                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400">$</span>
+                                    </div>
+                                    <div className="col-span-1 flex justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveService(index)}
+                                            className="p-1.5 text-zinc-300 hover:text-red-500 transition-colors disabled:opacity-20"
+                                            disabled={isFinalized}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {!isFinalized && (
+                            <button
+                                type="button"
+                                onClick={handleAddService}
+                                className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors py-1"
+                            >
+                                <PlusCircle className="w-4 h-4" />
+                                Agregar otro servicio
+                            </button>
+                        )}
+
+                        <div className="pt-2 flex justify-end">
+                            <div className="bg-zinc-50 px-4 py-2 rounded-xl border border-zinc-100 flex items-center gap-3">
+                                <span className="text-[10px] font-black text-zinc-400 uppercase">Total Servicios</span>
+                                <span className="text-sm font-black text-emerald-600">
+                                    ${totalServicesCost.toLocaleString('es-CL')}
+                                </span>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="space-y-2">

@@ -146,61 +146,73 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
     'Finalizado'
   ];
 
-  const currentIndex = Math.max(0, statusOrder.indexOf(ticket.status));
+  // Ordenar tickets por fecha de entrada descendente (más reciente arriba)
+  const sortedTickets = [...allTickets].sort((a, b) => {
+    const dateA = a.entry_date ? parseISO(a.entry_date).getTime() : 0;
+    const dateB = b.entry_date ? parseISO(b.entry_date).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  // El ticket actual es el primero de la lista (el más reciente) o el pasado por prop
+  const displayTicket = sortedTickets[0] || ticket;
+
+  if (!displayTicket) return null;
+
+  const currentIndex = Math.max(0, statusOrder.indexOf(displayTicket.status));
 
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex flex-col items-center py-8 px-4 font-sans">
+    <div className="min-h-screen bg-zinc-50 flex flex-col items-center py-4 px-4 font-sans">
       <div className="w-full max-w-3xl">
-        {/* Banner del Taller */}
-        {settings && (
-          <div className="text-center mb-6">
-            {settings.logo_url && !logoError ? (
+        {/* Banner del Taller Optimizado */}
+        <div className="bg-white rounded-3xl shadow-sm border border-zinc-100 p-4 mb-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {settings?.logo_url && !logoError ? (
               <img 
                 src={settings.logo_url} 
                 alt={settings.workshop_name} 
                 onError={() => setLogoError(true)}
-                className="w-16 h-16 rounded-2xl mx-auto mb-3 border border-zinc-200 shadow-sm object-cover" 
+                className="w-12 h-12 rounded-xl border border-zinc-100 shadow-sm object-cover" 
               />
             ) : (
-              <div className="w-20 h-20 rounded-2xl mx-auto mb-3 border border-zinc-200 shadow-inner flex items-center justify-center bg-black">
-                <img src="/logo3.png" alt="Roma Center SPA" className="w-16 h-16 object-contain" />
+              <div className="w-12 h-12 rounded-xl border border-zinc-200 shadow-inner flex items-center justify-center bg-black">
+                <img src="/logo3.png" alt="Roma Center SPA" className="w-8 h-8 object-contain" />
               </div>
             )}
-            <h1 className="text-2xl font-black tracking-tight text-zinc-900 uppercase">
-              {settings.workshop_name}
-            </h1>
-            <p className="text-sm text-zinc-500 font-medium flex flex-col items-center justify-center gap-1 mt-1">
-              <span className="flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5" />
+            <div className="flex flex-col">
+              <h1 className="text-lg font-black tracking-tight text-zinc-900 uppercase leading-none">
+                {settings?.workshop_name || 'Roma Center SPA'}
+              </h1>
+              <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
+                <MapPin className="w-3 h-3" />
                 Av. El Rosal 6065, Maipú
-              </span>
-              <span className="text-[10px] uppercase tracking-widest text-zinc-400">Santiago, Chile</span>
-            </p>
-            
-            {/* Botón WhatsApp */}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+             <button
+              onClick={onBack}
+              className="p-2 text-zinc-400 hover:text-zinc-900 rounded-full hover:bg-zinc-50 transition-colors"
+              title="Volver"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
             <a 
               href="https://wa.me/56993578563" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 mt-4 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-full text-xs font-bold transition-all shadow-md hover:scale-105"
+              className="flex items-center gap-2 px-4 py-2 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#128C7E] rounded-full text-[11px] font-black uppercase tracking-wider transition-all"
             >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.246 2.248 3.484 5.232 3.484 8.412-.003 6.557-5.338 11.892-11.893 11.892-1.997-.001-3.951-.5-5.688-1.448l-6.309 1.656zm6.29-4.143c1.559.925 3.33 1.414 5.14 1.415 5.4 0 9.793-4.393 9.795-9.794.001-2.618-1.02-5.08-2.88-6.941-1.86-1.86-4.321-2.881-6.942-2.881-5.4 0-9.792 4.392-9.795 9.794-.001 2.015.526 3.984 1.524 5.73l-.991 3.619 3.712-.974zm11.235-6.175c-.3-.149-1.771-.873-2.046-.973-.275-.1-.475-.149-.675.149-.2.299-.774.973-.948 1.172-.175.199-.35.225-.65.075-.3-.15-1.265-.467-2.41-1.487-.89-.794-1.49-1.774-1.666-2.074-.175-.3-.019-.462.131-.611.135-.134.299-.349.449-.524.15-.174.199-.299.299-.498.1-.2.05-.374-.025-.524-.075-.149-.675-1.623-.925-2.221-.244-.588-.492-.51-.675-.519-.174-.009-.374-.01-.574-.01s-.524.075-.798.374c-.275.299-1.047 1.023-1.047 2.495s1.072 2.893 1.222 3.093c.15.199 2.11 3.221 5.111 4.516.714.308 1.271.492 1.706.63.717.228 1.369.196 1.885.119.574-.085 1.771-.724 2.021-1.422.25-.698.25-1.297.175-1.422-.075-.125-.275-.199-.575-.349z"/></svg>
-              Conectar al WhatsApp
+              <Phone className="w-3.5 h-3.5" />
+              WhatsApp
             </a>
           </div>
-        )}
-
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-zinc-500 hover:text-zinc-900 font-medium mb-6 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Volver al inicio
-        </button>
+        </div>
 
         <div className="bg-white rounded-3xl shadow-xl border border-zinc-100 overflow-hidden">
           {/* Header */}
+          {/* Header con displayTicket */}
           <div className="bg-zinc-900 p-8 text-white flex flex-col md:flex-row md:items-center justify-between gap-6 relative">
             {onRefresh && (
               <button
@@ -224,18 +236,18 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
                 <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center">
                   <Car className="w-6 h-6" style={{ color: primaryColor }} />
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight">{ticket.model}</h1>
+                <h1 className="text-3xl font-bold tracking-tight">{displayTicket.model}</h1>
               </div>
               <p className="text-zinc-400 font-medium flex items-center gap-2">
-                Patente: <span className="font-mono bg-zinc-800 px-2 py-0.5 rounded-md tracking-wider leading-none" style={{ color: primaryColor }}>{ticket.id}</span>
+                Patente: <span className="font-mono bg-zinc-800 px-2 py-0.5 rounded-md tracking-wider leading-none" style={{ color: primaryColor }}>{displayTicket.id}</span>
               </p>
             </div>
 
             <div className="bg-zinc-800/50 p-4 rounded-2xl border border-zinc-700/50 min-w-[200px]">
               <p className="text-xs text-zinc-400 font-medium uppercase tracking-wider mb-1 text-center md:text-left">Reporte Actual</p>
               <p className="text-xl font-bold flex items-center justify-center md:justify-start gap-2" style={{ color: primaryColor }}>
-                {ticket.status === 'Finalizado' ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
-                {ticket.status}
+                {displayTicket.status === 'Finalizado' ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+                {displayTicket.status}
               </p>
             </div>
           </div>
@@ -296,38 +308,75 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
                   Observaciones Técnicas
                 </div>
                 <p className="text-sm text-zinc-600 mb-4 leading-relaxed">
-                  {ticket.notes}
+                  {displayTicket.notes}
                 </p>
                 <div className="text-xs text-zinc-500 font-medium flex items-center gap-1.5">
                   <Clock className="w-4 h-4" />
-                  Apertura: {safeFormatDate(ticket.entry_date)}
+                  Apertura: {safeFormatDate(displayTicket.entry_date)}
                 </div>
               </div>
 
-              <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100">
+              <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100 flex flex-col h-full">
                 <div className="flex items-center gap-2 mb-4 text-zinc-900 font-bold">
                   <Package className="w-5 h-5 text-zinc-500" />
                   Repuestos Aplicados
                 </div>
-                {ticket.parts_needed && ticket.parts_needed.length > 0 ? (
-                  <ul className="space-y-2">
-                    {ticket.parts_needed.map((part, idx) => (
-                      <li key={idx} className="text-sm text-zinc-600 flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: primaryColor }}></div>
-                        {part}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-zinc-500 italic">
-                    Sin repuestos registrados.
-                  </p>
-                )}
+                <div className="flex-1">
+                  {displayTicket.parts_needed && displayTicket.parts_needed.length > 0 ? (
+                    <ul className="space-y-2">
+                      {displayTicket.parts_needed.map((part, idx) => (
+                        <li key={idx} className="text-sm text-zinc-600 flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: primaryColor }}></div>
+                          {part}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-zinc-500 italic">
+                      Sin repuestos registrados.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Evidencia Fotográfica (Keep existing) */}
-            {ticket.job_photos && ticket.job_photos.length > 0 && (
+            {/* Nueva Sección: Servicios y Costos */}
+            {displayTicket.services && displayTicket.services.length > 0 && (
+              <div className="mt-6 bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden">
+                <div className="p-4 border-b border-zinc-50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-tight">Servicios Detallados</h3>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-4">
+                    {displayTicket.services.map((service, idx) => (
+                      <div key={idx} className="flex justify-between items-center group">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-400 group-hover:scale-125 transition-transform"></div>
+                          <span className="text-sm text-zinc-600 font-medium">{service.descripcion}</span>
+                        </div>
+                        <span className="text-sm font-bold text-zinc-900">
+                          ${service.costo ? service.costo.toLocaleString('es-CL') : '0'}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="pt-4 border-t border-zinc-100 flex justify-end">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-zinc-400 uppercase">Total Servicios</span>
+                        <div className="text-lg font-black text-emerald-600">
+                          ${displayTicket.services.reduce((acc, curr) => acc + (curr.costo || 0), 0).toLocaleString('es-CL')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Evidencia Fotográfica con displayTicket */}
+            {displayTicket.job_photos && displayTicket.job_photos.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden mt-6">
                 <div className="p-4 border-b border-zinc-50 flex items-center gap-2">
                   <Camera className="w-4 h-4 text-emerald-500" />
@@ -335,7 +384,7 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
                 </div>
                 <div className="p-4">
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {ticket.job_photos.map((photo, index) => (
+                    {displayTicket.job_photos.map((photo, index) => (
                       <a 
                         key={index} 
                         href={photo} 
@@ -354,85 +403,77 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
                 </div>
               </div>
             )}
-
-            {/* Quotation (Keep existing) */}
-            {ticket.status === 'En Espera' && ticket.quotation_total !== undefined && ticket.quotation_total > 0 && (
-              <div className="mt-8 p-8 rounded-3xl border-2 flex flex-col md:flex-row items-center justify-between gap-6" 
-                   style={{ backgroundColor: primaryBg, borderColor: `${primaryColor}20` }}>
-                <div className="text-center md:text-left">
-                  <h4 className="font-bold text-xl mb-1" style={{ color: primaryColor }}>Cotización del Servicio</h4>
-                  <p className="font-medium text-zinc-600">Diagnóstico listo para autorización.</p>
-                </div>
-                <div className="flex flex-col items-center md:items-end gap-3">
-                  <div className="text-3xl font-black" style={{ color: primaryColor }}>
-                    ${ticket.quotation_total.toLocaleString('es-CL')}
-                  </div>
-                  {ticket.quotation_accepted ? (
-                    <div className="flex items-center gap-2 font-bold bg-white px-4 py-2 rounded-xl border shadow-sm"
-                         style={{ color: primaryColor, borderColor: `${primaryColor}30` }}>
-                      <CheckCircle2 className="w-5 h-5" />
-                      Aceptada
-                    </div>
-                  ) : (
-                    <button
-                      onClick={async () => {
-                        setLoading(true);
-                        try {
-                          await onAcceptQuotation(ticket.id, ticket.model);
-                        } finally {
-                          setLoading(false);
-                        }
-                      }}
-                      disabled={loading}
-                      className="w-full md:w-auto px-8 py-3 text-white rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
-                      style={{ backgroundColor: primaryColor, boxShadow: `0 10px 15px -3px ${primaryColor}40` }}
-                    >
-                      {loading ? <Clock className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-                      Aceptar
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Historial de Reportes Antiguos */}
-        {allTickets.length > 1 && (
-          <div className="mt-12">
-            <h3 className="text-lg font-black text-zinc-900 mb-6 uppercase tracking-widest flex items-center gap-2 px-2">
-              <History className="w-5 h-5 text-zinc-400" />
-              Historial de Reportes Anteriores
+        {/* Historial de Reportes Antiguos Expandido */}
+        {sortedTickets.length > 1 && (
+          <div className="mt-12 space-y-8">
+            <h3 className="text-xl font-black text-zinc-900 uppercase tracking-widest flex items-center gap-3 px-2">
+              <div className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center">
+                <History className="w-4 h-4 text-white" />
+              </div>
+              Historial de Servicios Anteriores
             </h3>
-            <div className="space-y-4">
-              {allTickets.slice(1).map((histTicket, idx) => (
-                <div key={idx} className="bg-white p-6 rounded-2xl border border-zinc-100 shadow-sm hover:shadow-md transition-shadow group">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-zinc-50 rounded-xl flex items-center justify-center border border-zinc-100 group-hover:bg-zinc-100 transition-colors">
-                        <ImageIcon className="w-6 h-6 text-zinc-400" />
+            
+            <div className="space-y-6">
+              {sortedTickets.slice(1).map((histTicket, idx) => (
+                <div key={idx} className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden border-l-4" style={{ borderLeftColor: primaryColor }}>
+                  <div className="p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-zinc-50 rounded-xl flex items-center justify-center border border-zinc-100">
+                          <ImageIcon className="w-5 h-5 text-zinc-400" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-zinc-900 leading-tight">Servicio del {safeFormatDate(histTicket.entry_date)}</h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-black uppercase bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-md tracking-wider">
+                              {histTicket.status}
+                            </span>
+                            {histTicket.mileage && (
+                              <span className="text-[10px] font-black uppercase text-zinc-400">
+                                {histTicket.mileage.toLocaleString('es-CL')} KM
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-bold text-zinc-900 leading-tight">Servicio de {safeFormatDate(histTicket.entry_date)}</h4>
-                        <p className="text-xs text-zinc-500 font-medium">Estado: {histTicket.status}</p>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Inversión</p>
+                        <p className="text-xl font-black text-zinc-900">
+                           ${(histTicket.services?.reduce((acc, s) => acc + (s.costo || 0), 0) || 0).toLocaleString('es-CL')}
+                        </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                       {histTicket.cost && (
-                         <div className="px-3 py-1 bg-zinc-50 border border-zinc-100 rounded-lg text-sm font-bold text-zinc-900">
-                           ${histTicket.cost.toLocaleString('es-CL')}
-                         </div>
-                       )}
-                       <div className="p-2 border border-zinc-100 rounded-lg text-zinc-400 group-hover:text-zinc-900 transition-colors">
-                         <AlertCircle className="w-4 h-4" />
-                       </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Notas del Historial */}
+                      <div className="bg-zinc-50/50 p-4 rounded-2xl border border-zinc-100">
+                         <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-2">Observaciones</p>
+                         <p className="text-xs text-zinc-600 leading-relaxed italic">
+                           {histTicket.notes || 'Sin observaciones registradas.'}
+                         </p>
+                      </div>
+
+                      {/* Servicios del Historial */}
+                      <div className="bg-zinc-50/50 p-4 rounded-2xl border border-zinc-100">
+                         <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-2">Servicios Realizados</p>
+                         {histTicket.services && histTicket.services.length > 0 ? (
+                           <ul className="space-y-1.5">
+                             {histTicket.services.map((s, si) => (
+                               <li key={si} className="text-xs text-zinc-600 flex justify-between">
+                                 <span className="font-medium">• {s.descripcion}</span>
+                                 <span className="text-zinc-400 font-bold">${(s.costo || 0).toLocaleString('es-CL')}</span>
+                               </li>
+                             ))}
+                           </ul>
+                         ) : (
+                           <p className="text-[10px] text-zinc-400 italic">No hay servicios detallados.</p>
+                         )}
+                      </div>
                     </div>
                   </div>
-                  {histTicket.notes && (
-                    <div className="mt-4 pt-4 border-t border-zinc-50">
-                      <p className="text-xs text-zinc-600 line-clamp-2 italic leading-relaxed">"{histTicket.notes}"</p>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
