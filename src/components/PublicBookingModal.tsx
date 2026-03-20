@@ -17,7 +17,7 @@ interface PublicBookingModalProps {
 
 const TIME_SLOTS = [
     '09:00', '10:00', '11:00', '12:00',
-    '15:00', '16:00', '17:00', '18:00'
+    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'
 ];
 
 export function PublicBookingModal({ isOpen, onClose, fetchCompanies, onAddReminder, fetchOccupied, fetchVehicleInfo, branding }: PublicBookingModalProps) {
@@ -368,7 +368,7 @@ export function PublicBookingModal({ isOpen, onClose, fetchCompanies, onAddRemin
                                     <Clock className="w-4 h-4" style={{ color: primaryColor }} />
                                     Horarios Disponibles
                                 </label>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                                     {TIME_SLOTS.map(slot => {
                                         const [hours, minutes] = slot.split(':').map(Number);
                                         const slotDate = new Date(formData.planned_date + 'T00:00:00');

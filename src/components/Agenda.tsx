@@ -29,7 +29,7 @@ import {
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '../lib/utils';
-import { useGarageStore } from '../hooks/useGarageStore';
+import { useGarageStore, TIME_SLOTS } from '../hooks/useGarageStore';
 import { isChileanHoliday, getChileanHoliday } from '../lib/chileanHolidays';
 
 interface AgendaProps {
@@ -38,9 +38,10 @@ interface AgendaProps {
     customers: Customer[];
     reminders: Reminder[];
     settings: GarageSettings | null;
-    addReminder: (reminder: Partial<Reminder>) => Promise<void>;
+    addReminder: (reminder: any) => Promise<void>;
     updateReminder: (id: string, updates: Partial<Reminder>) => Promise<void>;
     deleteReminder: (id: string) => Promise<void>;
+    fetchOccupiedReminders?: (companyId: string, date: string) => Promise<string[]>;
 }
 
 export function Agenda({ 
@@ -51,7 +52,8 @@ export function Agenda({
     settings,
     addReminder,
     updateReminder,
-    deleteReminder
+    deleteReminder,
+    fetchOccupiedReminders
 }: AgendaProps) {
     const [viewMode, setViewMode] = useState<'calendar' | 'list' | 'preventive'>('calendar');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -60,12 +62,26 @@ export function Agenda({
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [formDate, setFormDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [formTime, setFormTime] = useState('');
+    const [occupiedSlots, setOccupiedSlots] = useState<string[]>([]);
 
     const [newReminder, setNewReminder] = useState<Partial<Reminder>>({
         reminder_type: 'Mantención General',
         planned_date: new Date().toISOString(),
         completed: false
     });
+
+    const [editingTimeId, setEditingTimeId] = useState<string | null>(null);
+    const [editingTimeValue, setEditingTimeValue] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    // Fetch occupied slots for the selected form date
+    React.useEffect(() => {
+        if (isAddModalOpen && fetchOccupiedReminders && settings?.company_id) {
+            fetchOccupiedReminders(settings.company_id, formDate)
+                .then(setOccupiedSlots)
+                .catch(err => console.error('Error fetching occupied slots:', err));
+        }
+    }, [isAddModalOpen, formDate, fetchOccupiedReminders, settings?.company_id]);
 
     // Lógica para Mantenimientos Preventivos (8-9 meses)
     const preventiveTickets = useMemo(() => {
@@ -161,21 +177,43 @@ export function Agenda({
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newReminder.customer_name || !newReminder.patente) return;
-        
-        let finalDate = new Date(formDate + 'T00:00:00'); 
-        if (formTime) {
-           finalDate = new Date(`${formDate}T${formTime}:00`);
+        if (!newReminder.customer_name || !newReminder.patente || !formTime) {
+            alert('Por favor selecciona un horario y completa los datos');
+            return;
         }
+        
+        setSaving(true);
+        try {
+            let finalDate = new Date(formDate + 'T00:00:00'); 
+            if (formTime) {
+               finalDate = new Date(`${formDate}T${formTime}:00`);
+            }
 
-        await addReminder({ ...newReminder, planned_date: finalDate.toISOString() });
-        setIsAddModalOpen(false);
-        setFormTime('');
-        setNewReminder({
-            reminder_type: 'Mantención General',
-            planned_date: selectedDate.toISOString(),
-            completed: false
-        });
+            await addReminder({ 
+                ...newReminder, 
+                company_id: settings?.company_id,
+                planned_date: finalDate.toISOString(),
+                planned_time: formTime || '00:00',
+            });
+
+            setIsAddModalOpen(false);
+            setFormTime('');
+            setOccupiedSlots([]);
+            setNewReminder({
+                reminder_type: 'Mantención General',
+                planned_date: selectedDate.toISOString(),
+                completed: false
+            });
+        } catch (error: any) {
+            console.error('Error adding reminder:', error);
+            if (error.message === 'SLOT_OCCUPIED') {
+                alert('Este horario ya ha sido reservado');
+            } else {
+                alert('Error al agendar cita');
+            }
+        } finally {
+            setSaving(false);
+        }
     };
 
     const sendWhatsApp = (reminder: Reminder) => {
@@ -297,8 +335,38 @@ export function Agenda({
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{safeFormatDateReminders(r.planned_date)}</span>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 flex items-center gap-1">
-                                                        <Clock className="w-3 h-3" /> {r.planned_time || '00:00'}
+                                                    <span 
+                                                        className={cn(
+                                                            "text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 flex items-center gap-1 transition-all cursor-pointer hover:bg-emerald-100",
+                                                            editingTimeId === r.id && "ring-2 ring-emerald-500 ring-offset-1"
+                                                        )}
+                                                        onClick={() => {
+                                                            setEditingTimeId(r.id);
+                                                            setEditingTimeValue(r.planned_time || '00:00');
+                                                        }}
+                                                    >
+                                                        {editingTimeId === r.id ? (
+                                                            <input 
+                                                                type="time"
+                                                                autoFocus
+                                                                className="bg-white/80 border-none outline-none font-bold text-xs px-1 rounded w-20 text-center"
+                                                                value={editingTimeValue}
+                                                                onChange={e => setEditingTimeValue(e.target.value)}
+                                                                onClick={e => e.stopPropagation()}
+                                                                onBlur={async () => {
+                                                                    if (editingTimeValue !== r.planned_time) {
+                                                                        await updateReminder(r.id, { planned_time: editingTimeValue });
+                                                                    }
+                                                                    setEditingTimeId(null);
+                                                                }}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') e.currentTarget.blur();
+                                                                    if (e.key === 'Escape') setEditingTimeId(null);
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <><Clock className="w-3 h-3" /> {r.planned_time || '00:00'}</>
+                                                        )}
                                                     </span>
                                                     <span className={cn(
                                                         "text-[10px] font-bold px-2 py-0.5 rounded-lg border",
@@ -558,13 +626,50 @@ export function Agenda({
                                     r.completed ? "border-zinc-100 opacity-60" : "border-zinc-200 hover:border-emerald-500 active:scale-[0.98]"
                                 )}>
                                     <div className="flex justify-between items-start mb-4">
-                                        <div className={cn(
-                                            "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5",
-                                            r.completed ? "bg-zinc-100 text-zinc-500" : 
-                                            r.reminder_type === 'Cita Web' ? "bg-blue-100 text-blue-700" :
-                                            "bg-emerald-100 text-emerald-700"
-                                        )}>
-                                            {r.reminder_type} {hasTime && <><Clock className="w-3 h-3 ml-1" /> {timeFormat}</>}
+                                        <div 
+                                            className={cn(
+                                                "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all",
+                                                r.completed ? "bg-zinc-100 text-zinc-500" : 
+                                                r.reminder_type === 'Cita Web' ? "bg-blue-100 text-blue-700 hover:bg-blue-200" :
+                                                "bg-emerald-100 text-emerald-700 hover:bg-emerald-200",
+                                                !r.completed && "cursor-pointer"
+                                            )}
+                                            onClick={() => {
+                                                if (!r.completed) {
+                                                    setEditingTimeId(r.id);
+                                                    setEditingTimeValue(r.planned_time || '00:00');
+                                                }
+                                            }}
+                                        >
+                                            {r.reminder_type} 
+                                            {editingTimeId === r.id ? (
+                                                <input 
+                                                    type="time"
+                                                    autoFocus
+                                                    className="bg-white/80 border-none outline-none font-bold text-[10px] px-1 rounded ml-1 w-20 text-center"
+                                                    value={editingTimeValue}
+                                                    onChange={e => setEditingTimeValue(e.target.value)}
+                                                    onClick={e => e.stopPropagation()}
+                                                    onBlur={async () => {
+                                                        if (editingTimeValue !== r.planned_time) {
+                                                            await updateReminder(r.id, { planned_time: editingTimeValue });
+                                                        }
+                                                        setEditingTimeId(null);
+                                                    }}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') e.currentTarget.blur();
+                                                        if (e.key === 'Escape') setEditingTimeId(null);
+                                                    }}
+                                                />
+                                            ) : (
+                                                <>
+                                                    {hasTime ? (
+                                                        <><Clock className="w-3 h-3 ml-1" /> {timeFormat}</>
+                                                    ) : (
+                                                        <span className="opacity-40 italic ml-1">(sin hora)</span>
+                                                    )}
+                                                </>
+                                            )}
                                         </div>
                                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
@@ -749,21 +854,42 @@ export function Agenda({
                                         onChange={e => setFormDate(e.target.value)}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-zinc-400 uppercase tracking-widest">Hora (Opcional)</label>
-                                    <input
-                                        type="time"
-                                        className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none focus:border-emerald-500 transition-all shadow-sm font-mono"
-                                        value={formTime}
-                                        onChange={e => setFormTime(e.target.value)}
-                                    />
+                                <div className="space-y-2 col-span-2">
+                                    <label className="text-xs font-black text-zinc-400 uppercase tracking-widest">Hora Agendada</label>
+                                    <div className="grid grid-cols-5 gap-2">
+                                        {TIME_SLOTS.map(slot => {
+                                            const isOccupied = occupiedSlots.includes(slot);
+                                            return (
+                                                <button
+                                                    key={slot}
+                                                    type="button"
+                                                    disabled={isOccupied}
+                                                    onClick={() => setFormTime(slot)}
+                                                    className={cn(
+                                                        "py-2 rounded-lg text-sm font-bold transition-all border",
+                                                        formTime === slot
+                                                            ? "bg-zinc-900 text-white border-zinc-900 shadow-md transform scale-105"
+                                                            : isOccupied
+                                                                ? "bg-zinc-50 text-zinc-300 border-zinc-100 cursor-not-allowed"
+                                                                : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-900 hover:shadow-sm"
+                                                    )}
+                                                >
+                                                    {slot}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
                             <button
                                 type="submit"
-                                className="w-full py-3.5 bg-zinc-900 hover:bg-black text-white rounded-2xl font-black transition-all shadow-lg shadow-zinc-200 active:scale-95 uppercase tracking-widest mt-2"
+                                disabled={saving}
+                                className={cn(
+                                    "w-full py-3.5 bg-zinc-900 hover:bg-black text-white rounded-2xl font-black transition-all shadow-lg active:scale-95 uppercase tracking-widest mt-2",
+                                    saving && "opacity-50 cursor-not-allowed"
+                                )}
                             >
-                                Agendar Recordatorio
+                                {saving ? 'Agendando...' : 'Agendar Recordatorio'}
                             </button>
                         </form>
                     </div>

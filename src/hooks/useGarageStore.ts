@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { Ticket, TicketStatus, Mechanic, Part, Customer, GarageSettings, Reminder, GarageNotification } from '../types';
 import { supabase, supabaseGarage } from '../lib/supabase';
 
+export const TIME_SLOTS = [
+  '09:00', '10:00', '11:00', '12:00',
+  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'
+];
+
+
 export function useGarageStore(companyId?: string) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [mechanics, setMechanics] = useState<Mechanic[]>([]);
@@ -752,6 +758,7 @@ export function useGarageStore(companyId?: string) {
 
       // Normalizar input (remover espacios y guiones para patentes)
       const normalizedInput = identificador.trim().replace(/[-\s\.\-·]/g, '').toUpperCase();
+      const numericInput = identificador.replace(/\D/g, '');
 
       // 1. Buscar en garage_tickets (historial de trabajos) para obtener datos rápidos del vehículo
       try {
@@ -767,52 +774,53 @@ export function useGarageStore(companyId?: string) {
       } catch (e) {}
 
       // 2. Buscar en garage_customers (base de datos de clientes)
-      // Intentar primero por patente asociada (last_vehicle_id)
+      // Nota: 'last_vehicle_id' no existe en la tabla, usamos 'vehicles'
       try {
-        const { data: customerByVehicle } = await supabaseGarage
+        // Fallback: Buscar en el array de vehículos (columna jsonb o array)
+        const { data: customers } = await supabaseGarage
           .from('garage_customers')
-          .select('name, phone, last_model, last_vehicle_id')
+          .select('name, phone, last_model, vehicles')
           .eq('company_id', company_id)
-          .ilike('last_vehicle_id', normalizedInput)
-          .maybeSingle();
+          .contains('vehicles' as any, [normalizedInput]);
         
-        if (customerByVehicle) {
-          customerData = customerByVehicle;
-        } else {
-          // Fallback: Buscar en el array de vehículos (columna jsonb o array)
-          const { data } = await supabaseGarage
-            .from('garage_customers')
-            .select('name, phone, last_model, last_vehicle_id')
-            .eq('company_id', company_id)
-            .contains('vehicles' as any, [normalizedInput])
-            .maybeSingle();
-          if (data) customerData = data;
+        if (customers && customers.length > 0) {
+          customerData = customers[0];
         }
       } catch (e) {}
 
       // 3. Fallback: Intentar buscar por teléfono si el input es numérico
       if (!customerData && !ticketData) {
-        const numericInput = identificador.replace(/\D/g, '');
+        // Chile: números móviles son de 9 dígitos, fijos de 8 o 9. Buscamos al menos 8.
         if (numericInput.length >= 8) {
             try {
-                const { data: byPhone } = await supabaseGarage
+                // Buscamos todos los que coincidan con el patrón, para evitar error de maybeSingle
+                const { data: multipleByPhone } = await supabaseGarage
                     .from('garage_customers')
-                    .select('name, phone, last_model, last_vehicle_id')
+                    .select('name, phone, last_model, vehicles')
                     .eq('company_id', company_id)
-                    .ilike('phone', `%${numericInput}%`)
-                    .maybeSingle();
-                if (byPhone) customerData = byPhone;
+                    .ilike('phone', `%${numericInput}%`);
+                
+                if (multipleByPhone && multipleByPhone.length > 0) {
+                    // Priorizamos el que tenga vehículos asociados si hay varios
+                    customerData = multipleByPhone.find(c => Array.isArray(c.vehicles) && c.vehicles.length > 0) || multipleByPhone[0];
+                }
             } catch (e) {}
         }
       }
 
       if (!customerData && !ticketData) return null;
 
+      // Determinamos el vehicle_id (patente)
+      // Si vino de customerData, usamos el primero de su lista de vehículos
+      const customerPlate = (Array.isArray(customerData?.vehicles) && customerData.vehicles.length > 0) 
+        ? customerData.vehicles[0] 
+        : null;
+
       return {
         owner_name: customerData?.name || ticketData?.owner_name || '',
         owner_phone: customerData?.phone || ticketData?.owner_phone || '',
         model: customerData?.last_model || ticketData?.model || '',
-        vehicle_id: customerData?.last_vehicle_id || ticketData?.id || normalizedInput
+        vehicle_id: customerPlate || ticketData?.id || (numericInput.length >= 8 ? '' : normalizedInput)
       };
     },
     fetchPublicSettingsBySlug: async (slug: string) => {
@@ -835,17 +843,25 @@ export function useGarageStore(companyId?: string) {
       if (sError) throw sError;
       return settings;
     },
-    addPublicReminder: async (reminder: any) => {
+    addIntelligentReminder: async (reminder: any) => {
       // 0. Strict check if slot is already taken (Collision prevention)
-      const nextDay = new Date(reminder.planned_date);
+      // Normalizamos la fecha a YYYY-MM-DD para la búsqueda
+      const dateOnly = reminder.planned_date.includes('T') ? reminder.planned_date.split('T')[0] : reminder.planned_date;
+      
+      const nextDay = new Date(dateOnly);
       nextDay.setDate(nextDay.getDate() + 1);
       const nextDayStr = nextDay.toISOString().split('T')[0];
+
+      const effectiveCompanyId = reminder.company_id || companyId;
+      if (!effectiveCompanyId) {
+        throw new Error('MISSING_COMPANY_ID');
+      }
 
       const { data: existing } = await supabaseGarage
         .from('garage_reminders')
         .select('id')
-        .eq('company_id', reminder.company_id)
-        .gte('planned_date', reminder.planned_date)
+        .eq('company_id', effectiveCompanyId)
+        .gte('planned_date', dateOnly)
         .lt('planned_date', nextDayStr)
         .ilike('planned_time', `${reminder.planned_time}%`)
         .maybeSingle();
@@ -857,7 +873,11 @@ export function useGarageStore(companyId?: string) {
       // 1. Insert reminder
       const { data: newReminder, error } = await supabaseGarage
         .from('garage_reminders')
-        .insert([reminder])
+        .insert([{
+            ...reminder,
+            company_id: effectiveCompanyId,
+            planned_date: dateOnly // Guardamos solo la fecha para consistencia
+        }])
         .select()
         .single();
         
@@ -872,36 +892,44 @@ export function useGarageStore(companyId?: string) {
         const numericPhone = reminder.customer_phone?.replace(/\D/g, '');
 
         if (normalizedPatente || numericPhone) {
-          // Intentar encontrar cliente existente
-          const { data: existingCustomer } = await supabaseGarage
+          // Intentar encontrar cliente existente principalmente por teléfono
+          const { data: customers } = await supabaseGarage
             .from('garage_customers')
-            .select('id, name, phone, last_model, last_vehicle_id')
+            .select('id, name, phone, last_model, vehicles')
             .eq('company_id', reminder.company_id)
-            .or(`last_vehicle_id.ilike.${normalizedPatente},phone.ilike.%${numericPhone}%`)
-            .maybeSingle();
+            .ilike('phone', `%${numericPhone}%`);
+
+          const existingCustomer = (customers && customers.length > 0) ? customers[0] : null;
 
           if (existingCustomer) {
-            // Actualizar si hay cambios significativos
+            // Actualizar si hay cambios significativos o si el vehículo es nuevo para este cliente
+            const currentVehicles = Array.isArray(existingCustomer.vehicles) ? existingCustomer.vehicles : [];
+            const isNewVehicle = normalizedPatente && !currentVehicles.includes(normalizedPatente);
+            
             const hasChanges = 
               existingCustomer.name !== reminder.customer_name || 
               existingCustomer.phone !== reminder.customer_phone ||
               existingCustomer.last_model !== reminder.vehicle_model ||
-              existingCustomer.last_vehicle_id !== normalizedPatente;
+              isNewVehicle;
 
             if (hasChanges) {
+              const updatedVehicles = isNewVehicle 
+                ? [...currentVehicles, normalizedPatente] 
+                : currentVehicles;
+
               await supabaseGarage
                 .from('garage_customers')
                 .update({
                   name: reminder.customer_name,
                   phone: reminder.customer_phone,
                   last_model: reminder.vehicle_model,
-                  last_vehicle_id: normalizedPatente,
+                  vehicles: updatedVehicles,
                   updated_at: new Date().toISOString()
                 })
                 .eq('id', existingCustomer.id);
             }
           } else if (reminder.customer_name && reminder.customer_phone) {
-            // Crear nuevo cliente si no existe (opcional, pero útil para CRM)
+            // Crear nuevo cliente si no existe
             await supabaseGarage
               .from('garage_customers')
               .insert([{
@@ -909,7 +937,6 @@ export function useGarageStore(companyId?: string) {
                 name: reminder.customer_name,
                 phone: reminder.customer_phone,
                 last_model: reminder.vehicle_model,
-                last_vehicle_id: normalizedPatente,
                 vehicles: normalizedPatente ? [normalizedPatente] : []
               }]);
           }
@@ -922,7 +949,7 @@ export function useGarageStore(companyId?: string) {
       try {
         await supabaseGarage.from('garage_notifications').insert([{
           company_id: reminder.company_id,
-          message: `NUEVA CITA WEB: ${reminder.customer_name} ha agendado para el ${reminder.planned_date} a las ${reminder.planned_time} hrs (${reminder.vehicle_model}).`,
+          message: `NUEVA CITA: ${reminder.customer_name} ha agendado para el ${reminder.planned_date} a las ${reminder.planned_time} hrs (${reminder.vehicle_model}).`,
           read: false
         }]);
       } catch (notifyError) {

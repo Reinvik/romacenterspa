@@ -23,11 +23,14 @@ interface LayoutProps {
   onAddTicket?: () => void;
   onRefresh?: () => Promise<void>;
   reminders?: any[];
+  isMonitorMode?: boolean;
+  setIsMonitorMode?: (val: boolean) => void;
 }
 
 export function Layout({ 
   children, activeTab, setActiveTab, onLogout, notifications, markAsRead, settings, isSuperAdmin, branding,
-  searchTerm, setSearchTerm, viewDate, setViewDate, onAddTicket, onRefresh, reminders = []
+  searchTerm, setSearchTerm, viewDate, setViewDate, onAddTicket, onRefresh, reminders = [],
+  isMonitorMode = false, setIsMonitorMode
 }: LayoutProps) {
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
@@ -77,7 +80,8 @@ export function Layout({
       {/* Sidebar */}
       <aside className={cn(
         "fixed inset-y-0 left-0 w-72 bg-zinc-900 text-zinc-100 flex flex-col z-50 transition-transform duration-300 lg:relative lg:translate-x-0 lg:w-64 shrink-0",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full",
+        isMonitorMode && "hidden"
       )}>
         <div className="p-6 flex items-center justify-between border-b border-zinc-800">
           <div className="flex items-center gap-3">
@@ -173,6 +177,7 @@ export function Layout({
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Header */}
+        {!isMonitorMode && (
         <header className="h-16 bg-white border-b border-zinc-200 flex items-center justify-between px-4 lg:px-8 shrink-0">
           <div className="flex items-center gap-3 flex-1">
             <button
@@ -250,9 +255,28 @@ export function Layout({
             )}
           </div>
         </header>
+        )}
+
+        {/* Monitor Mode Overlay Logo */}
+        {isMonitorMode && (
+          <div className="fixed top-4 right-4 z-50 opacity-40 hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md p-2 rounded-2xl border border-zinc-200 shadow-lg scale-90 md:scale-100">
+               <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center p-1 border border-zinc-700">
+                  <img src="/logo3.png" alt="Roma Center SPA" className="w-8 h-8 object-contain" />
+               </div>
+               <div className="flex flex-col">
+                  <span className="text-sm font-black text-zinc-900 leading-none">ROMA CENTER</span>
+                  <span className="text-[8px] font-bold text-zinc-500 tracking-[0.15em]">LUBRICANTES SPA</span>
+               </div>
+            </div>
+          </div>
+        )}
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-auto p-4 lg:p-8">
+        <div className={cn(
+          "flex-1 overflow-auto p-4 lg:p-8",
+          isMonitorMode && "p-0"
+        )}>
           {children}
         </div>
       </main>

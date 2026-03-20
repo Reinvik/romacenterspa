@@ -25,6 +25,7 @@ export interface ServiceLogEntry {
 export interface ServiceItem {
   descripcion: string;
   costo: number;
+  part_id?: string; // Optional link to inventory Part
 }
 
 export interface Ticket {
@@ -52,6 +53,7 @@ export interface Ticket {
   vehicle_notes?: string;
   job_photos?: string[];
   services?: ServiceItem[];
+  spare_parts?: ServiceItem[];
   created_at?: string;
 }
 
@@ -107,6 +109,7 @@ export interface GarageNotification {
 
 export interface GarageSettings {
   id: string;
+  company_id: string;
   workshop_name: string;
   address: string;
   phone: string;

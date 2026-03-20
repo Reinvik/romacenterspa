@@ -52,6 +52,7 @@ export default function App() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [viewDate, setViewDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [isMonitorMode, setIsMonitorMode] = useState(false);
 
   const { isSuperAdmin, profile } = useAuth();
 
@@ -67,9 +68,20 @@ export default function App() {
     acceptQuotation, markNotificationAsRead,
     clearFinishedTickets, deleteTicket,
     searchTicketsHistory,
-    fetchCompanies, addPublicReminder, fetchActiveReminder, fetchPublicSettingsBySlug, fetchOccupiedReminders, fetchPublicVehicleInfo,
+    fetchCompanies, addIntelligentReminder, fetchActiveReminder, fetchPublicSettingsBySlug, fetchOccupiedReminders, fetchPublicVehicleInfo,
     addReminder, deleteReminder, updateReminder, refreshData, uploadTicketPhoto
   } = useGarageStore(profile?.company_id);
+
+  // Monitor Mode Auto-refresh
+  useEffect(() => {
+    let interval: any;
+    if (isMonitorMode && activeTab === 'dashboard') {
+      interval = setInterval(() => {
+        refreshData();
+      }, 10000); // 10 seconds
+    }
+    return () => clearInterval(interval);
+  }, [isMonitorMode, activeTab, refreshData]);
 
   useEffect(() => {
     // Detect public branding from URL slug (?t=slug)
@@ -173,7 +185,7 @@ export default function App() {
         onAdminAccess={handleLogin}
         onCustomerSearch={handleCustomerSearch}
         fetchCompanies={fetchCompanies}
-        onAddReminder={addPublicReminder}
+        onAddReminder={addIntelligentReminder}
         fetchOccupied={fetchOccupiedReminders}
         fetchVehicleInfo={fetchPublicVehicleInfo}
         branding={publicBranding}
@@ -194,7 +206,7 @@ export default function App() {
           isOpen={isBookingModalOpen}
           onClose={() => setIsBookingModalOpen(false)}
           fetchCompanies={fetchCompanies}
-          onAddReminder={addPublicReminder}
+          onAddReminder={addIntelligentReminder}
           fetchOccupied={fetchOccupiedReminders}
           fetchVehicleInfo={fetchPublicVehicleInfo}
           branding={publicBranding}
@@ -234,6 +246,8 @@ export default function App() {
       onAddTicket={() => setIsAddModalOpen(true)}
       onRefresh={refreshData}
       reminders={reminders}
+      isMonitorMode={isMonitorMode}
+      setIsMonitorMode={setIsMonitorMode}
     >
       {activeTab === 'dashboard' && (
         <KanbanBoard
@@ -253,6 +267,8 @@ export default function App() {
           setSearchTerm={setSearchTerm}
           viewDate={viewDate}
           setViewDate={setViewDate}
+          isMonitorMode={isMonitorMode}
+          setIsMonitorMode={setIsMonitorMode}
         />
       )}
 
@@ -268,9 +284,10 @@ export default function App() {
           customers={customers} 
           reminders={reminders}
           settings={settings}
-          addReminder={addReminder}
+          addReminder={addIntelligentReminder}
           updateReminder={updateReminder}
           deleteReminder={deleteReminder}
+          fetchOccupiedReminders={fetchOccupiedReminders}
         />
       )}
 
@@ -319,6 +336,8 @@ export default function App() {
         customers={customers}
         tickets={tickets}
         settings={settings}
+        parts={parts}
+        onUpdatePart={updatePart}
       />
 
       <AddMechanicModal
@@ -334,6 +353,8 @@ export default function App() {
         parts={parts}
         onUpdate={updateTicket}
         onUploadPhoto={uploadTicketPhoto}
+        onUpdatePart={updatePart}
+        settings={settings}
       />
     </Layout>
   );

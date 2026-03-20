@@ -23,6 +23,7 @@ interface CustomersProps {
 const statusMap: Record<TicketStatus, string> = {
   'Ingresado': 'ingresado',
   'En Espera': 'en espera',
+  'En Mantención': 'en proceso',
   'En Reparación': 'en proceso',
   'Listo para Entrega': 'listo para entrega',
   'Finalizado': 'entregado',
@@ -375,6 +376,7 @@ export function Customers({ customers, tickets, settings, onAddCustomer, onUpdat
         onClose={() => setCrmTicket(null)}
         ticket={crmTicket}
         onUpdateNotes={onUpdateNotes}
+        settings={settings}
       />
     </div>
   );

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { cn } from '../lib/utils';
 import { format } from 'date-fns';
-import { Mechanic, TicketStatus, Customer, Ticket, GarageSettings, ServiceItem } from '../types';
-import { X, Search, Info, UserPlus, History, PlusCircle, Trash2 } from 'lucide-react';
+import { Mechanic, TicketStatus, Customer, Ticket, GarageSettings, ServiceItem, Part } from '../types';
+import { X, Search, Info, UserPlus, History, PlusCircle, Trash2, Package } from 'lucide-react';
 import { CAR_BRANDS, CAR_MODELS } from '../lib/carData';
 
 interface AddTicketModalProps {
@@ -12,9 +13,11 @@ interface AddTicketModalProps {
   customers: Customer[];
   tickets: Ticket[];
   settings: GarageSettings | null;
+  parts: Part[];
+  onUpdatePart?: (id: string, updates: Partial<Part>) => Promise<void>;
 }
 
-export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, tickets, settings }: AddTicketModalProps) {
+export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, tickets, settings, parts, onUpdatePart }: AddTicketModalProps) {
   const [formData, setFormData] = useState({
     id: '',
     model: '',
@@ -26,7 +29,11 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     mileage: 0,
     entry_date: format(new Date(), 'yyyy-MM-dd'),
     services: [{ descripcion: '', costo: 0 }] as ServiceItem[],
+    spare_parts: [] as ServiceItem[],
   });
+
+  const [partSearch, setPartSearch] = useState('');
+  const [showPartDropdown, setShowPartDropdown] = useState(false);
 
   const [brandSearch, setBrandSearch] = useState('');
   const [modelSuggestions, setModelSuggestions] = useState<string[]>([]);
@@ -116,11 +123,47 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     }
   }, [formData.model]);
 
+  const filteredInventory = useMemo(() => {
+    const search = partSearch.toLowerCase();
+    if (!search) return [];
+    return parts.filter(p => (
+      p.name.toLowerCase().includes(search) ||
+      p.id.toLowerCase().includes(search) ||
+      p.price.toString().includes(search)
+    ) && !formData.spare_parts.some(sp => sp.part_id === p.id));
+  }, [partSearch, parts, formData.spare_parts]);
+
+  const handleSelectInventoryPart = (part: Part) => {
+    setFormData(prev => ({
+      ...prev,
+      spare_parts: [...prev.spare_parts, {
+        descripcion: part.name,
+        costo: part.price,
+        part_id: part.id
+      }]
+    }));
+    setPartSearch('');
+    setShowPartDropdown(false);
+  };
+
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     onAdd(formData);
+
+    // Deduct stock for inventory parts
+    if (onUpdatePart && formData.spare_parts.length > 0) {
+      for (const sp of formData.spare_parts) {
+        if (sp.part_id) {
+          const inventoryPart = parts.find(p => p.id === sp.part_id);
+          if (inventoryPart && inventoryPart.stock > 0) {
+            await onUpdatePart(sp.part_id, { stock: inventoryPart.stock - 1 });
+          }
+        }
+      }
+    }
+
     onClose();
     setFormData({
       id: '',
@@ -133,6 +176,7 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
       mileage: 0,
       entry_date: format(new Date(), 'yyyy-MM-dd'),
       services: [{ descripcion: '', costo: 0 }],
+      spare_parts: [],
     });
   };
 
@@ -160,7 +204,33 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     setFormData(prev => ({ ...prev, services: newServices }));
   };
 
+  const handleAddSparePart = () => {
+    setFormData(prev => ({
+      ...prev,
+      spare_parts: [...prev.spare_parts, { descripcion: '', costo: 0 }]
+    }));
+  };
+
+  const handleRemoveSparePart = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      spare_parts: prev.spare_parts.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleSparePartChange = (index: number, field: keyof ServiceItem, value: string | number) => {
+    const newParts = [...formData.spare_parts];
+    if (field === 'costo') {
+      newParts[index][field] = Number(value);
+    } else {
+      newParts[index][field] = value as string;
+    }
+    setFormData(prev => ({ ...prev, spare_parts: newParts }));
+  };
+
   const totalServicesCost = formData.services.reduce((acc, curr) => acc + (curr.costo || 0), 0);
+  const totalSparePartsCost = formData.spare_parts.reduce((acc, curr) => acc + (curr.costo || 0), 0);
+  const totalEstimatedCost = totalServicesCost + totalSparePartsCost;
 
   return (
     <div className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -486,7 +556,131 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
               <div className="bg-zinc-50 px-4 py-2 rounded-xl border border-zinc-100 flex items-center gap-3">
                 <span className="text-[10px] font-black text-zinc-400 uppercase">Total Estimado</span>
                 <span className="text-sm font-black text-emerald-600">
-                  ${totalServicesCost.toLocaleString('es-CL')}
+                  ${totalEstimatedCost.toLocaleString('es-CL')}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Lista Dinámica de Repuestos */}
+          <div className="space-y-4 pt-4 border-t border-zinc-50">
+            <div className="flex items-center justify-between border-b border-zinc-50 pb-1">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
+                <h3 className="text-sm font-black text-zinc-900 uppercase tracking-widest">Búsqueda en Inventario y Repuestos</h3>
+              </div>
+            </div>
+
+            {/* Buscador de inventario */}
+            <div className="relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre, ID o precio..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 hover:border-blue-300 focus:border-blue-500 outline-none transition-all text-sm bg-white"
+                  value={partSearch}
+                  onChange={e => { setPartSearch(e.target.value); setShowPartDropdown(true); }}
+                  onFocus={() => setShowPartDropdown(true)}
+                />
+              </div>
+
+              {showPartDropdown && filteredInventory.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto">
+                  {filteredInventory.map(part => (
+                    <button
+                      key={part.id}
+                      type="button"
+                      disabled={part.stock === 0}
+                      onClick={() => handleSelectInventoryPart(part)}
+                      className={cn(
+                        "w-full flex items-center justify-between px-4 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-zinc-50 last:border-0",
+                        part.stock === 0 && "opacity-40 cursor-not-allowed"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Package className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <div>
+                            <span className="text-sm font-medium text-zinc-800">{part.name}</span>
+                            <div className="text-[9px] text-zinc-400 font-bold uppercase tracking-tighter">ID: {part.id}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 ml-2">
+                        <span className={cn(
+                          "text-[10px] font-bold px-1.5 py-0.5 rounded-md",
+                          part.stock === 0 ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-700"
+                        )}>
+                          {part.stock === 0 ? 'Sin stock' : `${part.stock} u.`}
+                        </span>
+                        <span className="text-xs font-black text-zinc-600">${part.price.toLocaleString('es-CL')}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-3">
+              {formData.spare_parts.length === 0 && (
+                <p className="text-[10px] text-zinc-400 italic text-center py-2 bg-zinc-50/50 rounded-xl border border-dashed border-zinc-100">
+                  Busca en inventario o agrega uno manual.
+                </p>
+              )}
+              {formData.spare_parts.map((part, index) => (
+                <div key={index} className="grid grid-cols-12 gap-2 items-center animate-in slide-in-from-left-2 duration-200">
+                  <div className="col-span-7 relative">
+                    {part.part_id && (
+                      <Package className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-400 pointer-events-none" />
+                    )}
+                    <input
+                      type="text"
+                      placeholder="Descripción del repuesto"
+                      className={cn(
+                        "w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-blue-500 outline-none transition-all text-sm bg-white",
+                        part.part_id && "pl-8 text-blue-700 bg-blue-50/30 border-blue-100"
+                      )}
+                      value={part.descripcion}
+                      onChange={(e) => handleSparePartChange(index, 'descripcion', e.target.value)}
+                      disabled={!!part.part_id}
+                    />
+                  </div>
+                  <div className="col-span-4 relative">
+                    <input
+                      type="number"
+                      placeholder="Costo"
+                      className="w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-blue-500 outline-none transition-all text-sm font-bold pl-5 bg-white"
+                      value={part.costo || ''}
+                      onChange={(e) => handleSparePartChange(index, 'costo', e.target.value)}
+                    />
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400">$</span>
+                  </div>
+                  <div className="col-span-1 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSparePart(index)}
+                      className="p-1.5 text-zinc-300 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAddSparePart}
+              className="flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 transition-colors py-1"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Agregar otro repuesto
+            </button>
+
+            <div className="pt-2 flex justify-end">
+              <div className="bg-zinc-900 px-4 py-2 rounded-xl border border-zinc-100 flex items-center gap-3">
+                <span className="text-[10px] font-black text-zinc-500 uppercase">Total Inversión Estimada</span>
+                <span className="text-sm font-black text-white">
+                  ${totalEstimatedCost.toLocaleString('es-CL')}
                 </span>
               </div>
             </div>

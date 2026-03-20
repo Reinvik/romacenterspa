@@ -2,7 +2,30 @@ import React, { useState } from 'react';
 import { Ticket, TicketStatus, Mechanic, Reminder } from '../types';
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Clock, User, MoreVertical, Plus, Car, Trash2, Search, CalendarCheck, Calendar } from 'lucide-react';
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  Calendar, 
+  ChevronLeft, 
+  ChevronRight, 
+  Clock, 
+  MoreVertical, 
+  Settings2, 
+  AlertCircle, 
+  CheckCircle2, 
+  Clock3, 
+  Wrench, 
+  User, 
+  Phone, 
+  Info, 
+  History, 
+  X, 
+  BarChart3, 
+  RefreshCw,
+  CalendarCheck,
+  Trash2 
+} from 'lucide-react';
 import { cn } from '../lib/utils';
 import { ConfirmModal } from './ConfirmModal';
 import { KanbanTicketCard } from './KanbanTicketCard';
@@ -28,6 +51,8 @@ interface KanbanBoardProps {
   setSearchTerm: (term: string) => void;
   viewDate: string;
   setViewDate: (date: string) => void;
+  isMonitorMode?: boolean;
+  setIsMonitorMode?: (val: boolean) => void;
 }
 
 const COLUMNS: { id: string; label: string; color: string; statuses: TicketStatus[] }[] = [
@@ -51,8 +76,11 @@ export function KanbanBoard({
   searchTerm,
   setSearchTerm,
   viewDate,
-  setViewDate
+  setViewDate,
+  isMonitorMode = false,
+  setIsMonitorMode
 }: KanbanBoardProps) {
+  const [zoomLevel, setZoomLevel] = useState(1);
   const [draggedTicketId, setDraggedTicketId] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -177,189 +205,261 @@ export function KanbanBoard({
     setDraggedTicketId(null);
   };
 
+  const filteredReminders = reminders.filter(r => {
+    // 1. Date Filter (Synchronized with viewDate)
+    const rDate = r.planned_date.includes('T') ? r.planned_date : `${r.planned_date}T00:00:00`;
+    const isSameDay = format(parseISO(rDate), 'yyyy-MM-dd') === viewDate;
+    if (!isSameDay || r.completed) return false;
+
+    // 2. Search Filter
+    if (searchTerm.length >= 2) {
+      const searchLower = searchTerm.toLowerCase();
+      return r.customer_name.toLowerCase().includes(searchLower) ||
+             r.customer_phone.includes(searchTerm) ||
+             r.patente.toLowerCase().includes(searchLower);
+    }
+    return true;
+  });
+
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const todayReminders = reminders.filter(r => format(parseISO(r.planned_date.includes('T') ? r.planned_date : `${r.planned_date}T00:00:00`), 'yyyy-MM-dd') === todayStr && !r.completed);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative overflow-hidden">
 
+      {/* ── Toolbar: Zoom + Monitor Toggle ───────────────────── */}
+      <div className={cn(
+        "flex flex-wrap items-center justify-between gap-3 mb-4 flex-shrink-0 px-1",
+        isMonitorMode && "fixed bottom-6 left-6 z-50 mb-0 px-0 bg-white/90 backdrop-blur-md p-2 rounded-2xl border border-zinc-200 shadow-2xl opacity-40 hover:opacity-100 transition-all duration-300 scale-90"
+      )}>
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Zoom controls */}
+          <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-xl border border-zinc-200">
+            <button
+              onClick={() => setZoomLevel(prev => Math.max(0.4, +(prev - 0.1).toFixed(1)))}
+              className="p-1.5 hover:bg-white rounded-lg transition-colors text-zinc-600 text-sm font-bold leading-none"
+              title="Alejar"
+            >−</button>
+            <span className="text-[10px] font-black font-mono w-10 text-center text-zinc-500 select-none">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+            <button
+              onClick={() => setZoomLevel(prev => Math.min(1, +(prev + 0.1).toFixed(1)))}
+              className="p-1.5 hover:bg-white rounded-lg transition-colors text-zinc-600 text-sm font-bold leading-none"
+              title="Acercar"
+            >+</button>
+          </div>
 
-      {/* Filtros de Mecánicos */}
-      {mechanics.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-4 mb-2 scrollbar-hide">
+          {/* Monitor Mode toggle */}
           <button
-            onClick={() => setSelectedMechanic(null)}
+            onClick={() => setIsMonitorMode?.(!isMonitorMode)}
             className={cn(
-              "px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 border",
-              selectedMechanic === null 
-                ? "bg-zinc-900 text-white border-zinc-900 shadow-sm" 
-                : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"
+              "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shadow-sm whitespace-nowrap",
+              isMonitorMode
+                ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600"
+                : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
             )}
           >
-            Todos
+            {isMonitorMode ? (
+              <><X className="w-3.5 h-3.5" />Salir Monitor</>
+            ) : (
+              <><BarChart3 className="w-3.5 h-3.5" />Modo Monitor</>
+            )}
           </button>
-          {mechanics.map(m => (
-            <button
-              key={m.id}
-              onClick={() => setSelectedMechanic(selectedMechanic === m.name ? null : m.name)}
-              className={cn(
-                "px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 border",
-                selectedMechanic === m.name 
-                  ? "bg-zinc-900 text-white border-zinc-900 shadow-sm" 
-                  : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"
-              )}
-            >
-              <div className={cn(
-                "w-4 h-4 rounded-full flex items-center justify-center text-[8px]",
-                selectedMechanic === m.name ? "bg-zinc-800 text-zinc-300" : "bg-zinc-100 text-zinc-500"
-              )}>
-                {m.name.charAt(0).toUpperCase()}
-              </div>
-              {m.name}
-            </button>
-          ))}
         </div>
-      )}
 
-      <div className="flex gap-3 overflow-x-auto pb-4 flex-1">
-        {/* Columna de Agenda */}
-        <div className="flex-1 min-w-[220px] bg-amber-50/50 rounded-2xl p-3 flex flex-col border border-amber-200/40">
-           <div className="flex items-center justify-between mb-3 px-0.5">
-              <div className="flex items-center gap-1.5">
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-amber-100 text-amber-800">
-                  Agenda
-                </span>
-                <span className="text-xs font-medium text-amber-600 bg-white px-1.5 py-0.5 rounded-full shadow-sm border border-amber-200">
-                  {todayReminders.length}
-                </span>
-              </div>
-              <CalendarCheck className="w-4 h-4 text-amber-300" />
-           </div>
+        {isMonitorMode && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20">
+            <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+            Auto 10s
+          </div>
+        )}
+      </div>
 
-           <div className="flex-1 overflow-y-auto space-y-2 min-h-[150px]">
-              {todayReminders
-                .sort((a, b) => new Date(a.planned_date).getTime() - new Date(b.planned_date).getTime())
-                .map((reminder) => (
-                <KanbanReminderCard
-                  key={reminder.id}
-                  reminder={reminder}
-                  settings={settings}
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('application/reminder-id', reminder.id);
-                    e.dataTransfer.effectAllowed = 'move';
-                  }}
-                />
+      {/* ── Boards area (zoomable) ───────────────────────────── */}
+      <div className="flex-1 overflow-hidden relative">
+        <div
+          className="absolute inset-0 transition-transform duration-300 ease-out origin-top-left"
+          style={{
+            transform: `scale(${zoomLevel})`,
+            width: `${(1 / zoomLevel) * 100}%`,
+            height: `${(1 / zoomLevel) * 100}%`,
+          }}
+        >
+          {/* Mechanic filters */}
+          {mechanics.length > 0 && (
+            <div className="flex justify-center gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide flex-shrink-0 w-full">
+              <button
+                onClick={() => setSelectedMechanic(null)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 border",
+                  selectedMechanic === null
+                    ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
+                    : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"
+                )}
+              >
+                Todos
+              </button>
+              {mechanics.map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setSelectedMechanic(selectedMechanic === m.name ? null : m.name)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 border",
+                    selectedMechanic === m.name
+                      ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
+                      : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"
+                  )}
+                >
+                  <div className={cn(
+                    "w-4 h-4 rounded-full flex items-center justify-center text-[8px]",
+                    selectedMechanic === m.name ? "bg-zinc-800 text-zinc-300" : "bg-zinc-100 text-zinc-500"
+                  )}>
+                    {m.name.charAt(0).toUpperCase()}
+                  </div>
+                  {m.name}
+                </button>
               ))}
-              {todayReminders.length === 0 && (
-                <div className="h-full flex items-center justify-center border-2 border-dashed border-amber-200/50 rounded-xl text-amber-400 text-xs font-medium">
-                  Sin citas hoy...
-                </div>
-              )}
-           </div>
-        </div>
+            </div>
+          )}
 
-        {COLUMNS.map((column) => {
-          const columnTickets = filteredTickets.filter((t) => column.statuses.includes(t.status));
-          
-          // Agrupar por día (Cierre > Último Servicio > Último Cambio > Entrada)
-          const groups: Record<string, Ticket[]> = {};
-          columnTickets.forEach(t => {
-            let dateStr = '';
-            if (t.status === 'Finalizado' || t.status === 'Entregado') {
-              if (t.close_date) dateStr = t.close_date;
-              else if (t.service_log && t.service_log.length > 0) {
-                const logDates = t.service_log
-                  .map(s => s.date?.match(/\d{4}-\d{2}-\d{2}/)?.[0])
-                  .filter(Boolean)
-                  .sort((a, b) => b!.localeCompare(a!));
-                if (logDates.length > 0) dateStr = logDates[0]!;
-              }
-              if (!dateStr) dateStr = t.last_status_change || t.entry_date;
-            } else {
-              dateStr = t.entry_date;
-            }
-            
-            const day = (dateStr || '').split('T')[0] || todayStr;
-            if (!groups[day]) groups[day] = [];
-            groups[day].push(t);
-          });
-          const sortedDays = Object.keys(groups).sort((a, b) => b.localeCompare(a));
-
-          return (
-            <div
-              key={column.id}
-              className="flex-1 min-w-[180px] bg-zinc-100 rounded-2xl p-3 flex flex-col border border-zinc-200/60"
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, column.id)}
-            >
+          {/* Columns row */}
+          <div className="flex gap-3 overflow-x-auto pb-4 h-full">
+            {/* Agenda column */}
+            <div className="flex-1 min-w-[200px] bg-amber-50/50 rounded-2xl p-3 flex flex-col border border-amber-200/40">
               <div className="flex items-center justify-between mb-3 px-0.5">
                 <div className="flex items-center gap-1.5">
-                  <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide uppercase", column.color)}>
-                    {column.label}
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-amber-100 text-amber-800">
+                    Agenda
                   </span>
-                  <span className="text-xs font-medium text-zinc-500 bg-white px-1.5 py-0.5 rounded-full shadow-sm border border-zinc-200">
-                    {columnTickets.length}
+                  <span className="text-xs font-medium text-amber-600 bg-white px-1.5 py-0.5 rounded-full shadow-sm border border-amber-200">
+                    {filteredReminders.length}
                   </span>
                 </div>
-                {column.id === 'Finalizado' && columnTickets.length > 0 && (
-                  <button
-                    onClick={() => setShowClearConfirm(true)}
-                    disabled={clearing}
-                    title="Limpiar finalizados"
-                    className="p-1 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all disabled:opacity-50"
-                  >
-                    <Trash2 className={cn("w-3.5 h-3.5", clearing && "animate-spin")} />
-                  </button>
-                )}
+                <CalendarCheck className="w-4 h-4 text-amber-300" />
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-4 min-h-[150px]">
-                {sortedDays.map(day => (
-                  <div key={day} className="space-y-2">
-                    <div className="flex items-center gap-2 sticky top-0 bg-zinc-100/95 backdrop-blur-sm py-1 z-10">
-                      <div className="h-px flex-1 bg-zinc-300/50"></div>
-                      <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest whitespace-nowrap">
-                        {day === todayStr ? 'Hoy' : format(parseISO(day), "d 'de' MMM", { locale: es })}
-                      </span>
-                      <div className="h-px flex-1 bg-zinc-300/50"></div>
-                    </div>
-                    {groups[day].map((ticket) => (
-                      <KanbanTicketCard
-                        key={ticket.id}
-                        ticket={ticket}
-                        settings={settings}
-                        selectedMechanic={selectedMechanic}
-                        isDragged={draggedTicketId === ticket.id}
-                        onDragStart={handleDragStart}
-                        onEdit={onEditTicket}
-                        onShowHistory={setHistoryTicket}
-                        onShowCRM={setCrmTicket}
-                      />
-                    ))}
-                  </div>
-                ))}
-                {columnTickets.length === 0 && (
-                  <div className="h-full flex items-center justify-center border-2 border-dashed border-zinc-300/50 rounded-xl text-zinc-400 text-xs font-medium">
-                    Arrastra aquí
+              <div className="flex-1 overflow-y-auto space-y-2 min-h-[150px]">
+                {filteredReminders
+                  .sort((a, b) => new Date(a.planned_date).getTime() - new Date(b.planned_date).getTime())
+                  .map((reminder) => (
+                    <KanbanReminderCard
+                      key={reminder.id}
+                      reminder={reminder}
+                      settings={settings}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('application/reminder-id', reminder.id);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                    />
+                  ))}
+                {filteredReminders.length === 0 && (
+                  <div className="h-full flex items-center justify-center border-2 border-dashed border-amber-200/50 rounded-xl text-amber-400 text-xs font-medium">
+                    Sin citas...
                   </div>
                 )}
               </div>
             </div>
-          );
-        })}
+
+            {/* Kanban status columns */}
+            {COLUMNS.map((column) => {
+              const columnTickets = filteredTickets.filter((t) => column.statuses.includes(t.status));
+
+              const groups: Record<string, Ticket[]> = {};
+              columnTickets.forEach(t => {
+                let dateStr = '';
+                if (t.status === 'Finalizado' || t.status === 'Entregado') {
+                  if (t.close_date) dateStr = t.close_date;
+                  else if (t.service_log && t.service_log.length > 0) {
+                    const logDates = t.service_log
+                      .map(s => s.date?.match(/\d{4}-\d{2}-\d{2}/)?.[0])
+                      .filter(Boolean)
+                      .sort((a, b) => b!.localeCompare(a!));
+                    if (logDates.length > 0) dateStr = logDates[0]!;
+                  }
+                  if (!dateStr) dateStr = t.last_status_change || t.entry_date;
+                } else {
+                  dateStr = t.entry_date;
+                }
+                const day = (dateStr || '').split('T')[0] || todayStr;
+                if (!groups[day]) groups[day] = [];
+                groups[day].push(t);
+              });
+              const sortedDays = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+              return (
+                <div
+                  key={column.id}
+                  className="flex-1 min-w-[180px] bg-zinc-100 rounded-2xl p-3 flex flex-col border border-zinc-200/60"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, column.id)}
+                >
+                  <div className="flex items-center justify-between mb-3 px-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide uppercase", column.color)}>
+                        {column.label}
+                      </span>
+                      <span className="text-xs font-medium text-zinc-500 bg-white px-1.5 py-0.5 rounded-full shadow-sm border border-zinc-200">
+                        {columnTickets.length}
+                      </span>
+                    </div>
+                    {column.id === 'Finalizado' && columnTickets.length > 0 && (
+                      <button
+                        onClick={() => setShowClearConfirm(true)}
+                        disabled={clearing}
+                        title="Limpiar finalizados"
+                        className="p-1 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all disabled:opacity-50"
+                      >
+                        <Trash2 className={cn("w-3.5 h-3.5", clearing && "animate-spin")} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-4 min-h-[150px]">
+                    {sortedDays.map(day => (
+                      <div key={day} className="space-y-2">
+                        <div className="flex items-center gap-2 sticky top-0 bg-zinc-100/95 backdrop-blur-sm py-1 z-10">
+                          <div className="h-px flex-1 bg-zinc-300/50"></div>
+                          <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest whitespace-nowrap">
+                            {day === todayStr ? 'Hoy' : format(parseISO(day), "d 'de' MMM", { locale: es })}
+                          </span>
+                          <div className="h-px flex-1 bg-zinc-300/50"></div>
+                        </div>
+                        {groups[day].map((ticket) => (
+                          <KanbanTicketCard
+                            key={ticket.id}
+                            ticket={ticket}
+                            settings={settings}
+                            selectedMechanic={selectedMechanic}
+                            isDragged={draggedTicketId === ticket.id}
+                            onDragStart={handleDragStart}
+                            onEdit={onEditTicket}
+                            onShowHistory={setHistoryTicket}
+                            onShowCRM={setCrmTicket}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                    {columnTickets.length === 0 && (
+                      <div className="h-full flex items-center justify-center border-2 border-dashed border-zinc-300/50 rounded-xl text-zinc-400 text-xs font-medium">
+                        Arrastra aquí
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
+      {/* ── Modals ───────────────────────────────────────────── */}
       <ConfirmModal
         isOpen={showClearConfirm}
         title="Limpiar Finalizados"
         message={`¿Estás seguro que deseas eliminar los tickets finalizados? Esta acción no se puede deshacer.`}
         onConfirm={async () => {
           setClearing(true);
-          try {
-            await onClearFinished();
-          } finally {
-            setClearing(false);
-          }
+          try { await onClearFinished(); } finally { setClearing(false); }
         }}
         onCancel={() => setShowClearConfirm(false)}
       />
