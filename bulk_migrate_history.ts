@@ -243,16 +243,17 @@ function findMapping(data: any[][]) {
     return map;
 }
 
-function excelDateToISO(serial: any) {
-  if (!serial) return new Date().toISOString();
+function excelDateToISO(serial: any): string | null {
+  if (!serial) return null;
   try {
     if (typeof serial === 'number') {
       const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
+      if (isNaN(date.getTime())) return null;
       return date.toISOString();
     }
     const d = new Date(serial);
-    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-  } catch (e) { return new Date().toISOString(); }
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  } catch (e) { return null; }
 }
 
 function chunkArray(array: any[], size: number) {

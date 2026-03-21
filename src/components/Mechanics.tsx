@@ -22,7 +22,10 @@ export function Mechanics({ mechanics, tickets, onAdd, onDelete, onUpdateTicket 
     const globalStats = React.useMemo(() => {
         const filterTicketsByPeriod = (targetDate: Date, mode: 'daily' | 'monthly' | 'yearly') => {
             return tickets.filter(t => {
-                const dateStr = t.close_date || t.last_status_change || t.entry_date;
+                // For revenue reporting: use close_date for finished tickets, entry_date otherwise
+                // Avoid using last_status_change as it's updated on every edit
+                const isClosed = t.status === 'Finalizado' || t.status === 'Entregado';
+                const dateStr = (isClosed && t.close_date) ? t.close_date : t.entry_date;
                 const d = parseISO(dateStr);
                 if (mode === 'daily') return isSameDay(d, targetDate);
                 if (mode === 'monthly') return d.getMonth() === targetDate.getMonth() && d.getFullYear() === targetDate.getFullYear();
@@ -92,7 +95,8 @@ export function Mechanics({ mechanics, tickets, onAdd, onDelete, onUpdateTicket 
         // Stats specific to the current period filter
         const currentTarget = modeToDate(filterMode, selectedDate, selectedMonth, selectedYear);
         const periodTickets = mechanicTickets.filter(t => {
-            const dateStr = t.close_date || t.last_status_change || t.entry_date;
+            const isClosed = t.status === 'Finalizado' || t.status === 'Entregado';
+            const dateStr = (isClosed && t.close_date) ? t.close_date : t.entry_date;
             const d = parseISO(dateStr);
             if (filterMode === 'daily') return isSameDay(d, currentTarget);
             if (filterMode === 'monthly') return d.getMonth() === currentTarget.getMonth() && d.getFullYear() === currentTarget.getFullYear();
