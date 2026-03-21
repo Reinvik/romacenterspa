@@ -43,12 +43,14 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
             setQuotationTotal(ticket.quotation_total || 0);
             setMileage(ticket.mileage || 0);
             setJobPhotos(ticket.job_photos || []);
-            setServices(ticket.services || [{ descripcion: '', costo: 0 }]);
             const savedParts = ticket.spare_parts || [];
+            const savedServices = ticket.services || [];
             setSpareParts(savedParts);
-            originalPartIds.current = savedParts
-                .filter(p => p.part_id)
-                .map(p => p.part_id!);
+            setServices(savedServices.length > 0 ? savedServices : [{ descripcion: '', costo: 0, cantidad: 1 }]);
+            originalPartIds.current = [
+                ...savedParts.filter(p => p.part_id).map(p => p.part_id!),
+                ...savedServices.filter(s => s.part_id).map(s => s.part_id!)
+            ];
         }
     }, [ticket]);
 
@@ -68,28 +70,37 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     const isFinalized = ticket?.status === 'Finalizado' || ticket?.status === 'Entregado';
 
     // Services
-    const handleAddService = () => setServices([...services, { descripcion: '', costo: 0 }]);
+    const handleAddService = () => setServices([...services, { descripcion: '', costo: 0, cantidad: 1 }]);
     const handleRemoveService = (index: number) => setServices(services.filter((_, i) => i !== index));
     const handleServiceChange = (index: number, field: keyof ServiceItem, value: string | number) => {
         const updated = [...services];
-        if (field === 'costo') updated[index].costo = Number(value);
-        else if (field === 'descripcion') updated[index].descripcion = value as string;
+        if (field === 'costo' || field === 'cantidad') {
+            const numVal = Number(value);
+            updated[index][field] = isNaN(numVal) ? 0 : numVal;
+        } else if (field === 'descripcion') {
+            updated[index].descripcion = value as string;
+        }
         setServices(updated);
     };
 
     // Spare parts (manual)
-    const handleAddSparePart = () => setSpareParts([...spareParts, { descripcion: '', costo: 0 }]);
+    const handleAddSparePart = () => setSpareParts([...spareParts, { descripcion: '', costo: 0, cantidad: 1 }]);
     const handleRemoveSparePart = (index: number) => setSpareParts(spareParts.filter((_, i) => i !== index));
     const handleSparePartChange = (index: number, field: keyof ServiceItem, value: string | number) => {
         const updated = [...spareParts];
-        if (field === 'costo') updated[index].costo = Number(value);
-        else if (field === 'descripcion') updated[index].descripcion = value as string;
+        if (field === 'costo' || field === 'cantidad') {
+            const numVal = Number(value);
+            updated[index][field] = isNaN(numVal) ? 0 : numVal;
+        } else if (field === 'descripcion') {
+            updated[index].descripcion = value as string;
+        }
         setSpareParts(updated);
     };
 
     // Inventory search
     const filteredInventory = parts.filter(p => {
         const search = partSearch.toLowerCase();
+        if (!search) return false;
         return (
             p.name.toLowerCase().includes(search) ||
             p.id.toLowerCase().includes(search) ||
@@ -98,18 +109,28 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     });
 
     const handleSelectInventoryPart = (part: Part) => {
-        setSpareParts(prev => [...prev, {
+        const isLabor = part.name.toUpperCase().includes('M.O.') || 
+                        part.name.toLowerCase().includes('mano de obra');
+        
+        const newItem = {
             descripcion: part.name,
             costo: part.price,
+            cantidad: 1,
             part_id: part.id,
-        }]);
+        };
+
+        if (isLabor) {
+            setServices(prev => [...prev.filter(s => s.descripcion || s.costo), newItem]);
+        } else {
+            setSpareParts(prev => [...prev, newItem]);
+        }
         setPartSearch('');
         setShowPartDropdown(false);
     };
 
     // Cost calculation
-    const totalServicesCost = services.reduce((acc, curr) => acc + (curr.costo || 0), 0);
-    const totalSparePartsCost = spareParts.reduce((acc, curr) => acc + (curr.costo || 0), 0);
+    const totalServicesCost = services.reduce((acc, curr) => acc + (curr.costo || 0) * (curr.cantidad ?? 1), 0);
+    const totalSparePartsCost = spareParts.reduce((acc, curr) => acc + (curr.costo || 0) * (curr.cantidad ?? 1), 0);
     const totalInvestment = totalServicesCost + totalSparePartsCost;
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,23 +156,28 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
             await onUpdate(ticket!.id, {
                 notes,
                 mechanic_id: mechanicId === 'Sin asignar' ? null : mechanicId,
-                quotation_total: totalInvestment > 0 ? totalInvestment : quotationTotal,
+                quotation_total: totalInvestment,
                 mileage,
                 job_photos: jobPhotos,
                 services,
                 spare_parts: spareParts,
             });
 
-            // Deduct stock for newly-added inventory parts
+            // Deduct stock for newly-added inventory parts (both in parts and services)
             if (onUpdatePart) {
-                const newPartIds = spareParts
-                    .filter(sp => sp.part_id && !originalPartIds.current.includes(sp.part_id))
-                    .map(sp => sp.part_id!);
+                const allCurrentItems = [...spareParts, ...services];
+                for (const sp of allCurrentItems) {
+                    if (sp.part_id && !originalPartIds.current.includes(sp.part_id)) {
+                        const isLabor = sp.descripcion.toUpperCase().includes('M.O.') || 
+                                        sp.descripcion.toLowerCase().includes('mano de obra');
+                        
+                        if (isLabor) continue; // Skip stock deduction for labor items
 
-                for (const partId of newPartIds) {
-                    const inventoryPart = parts.find(p => p.id === partId);
-                    if (inventoryPart && inventoryPart.stock > 0) {
-                        await onUpdatePart(partId, { stock: inventoryPart.stock - 1 });
+                        const inventoryPart = parts.find(p => p.id === sp.part_id);
+                        const qty = sp.cantidad ?? 1;
+                        if (inventoryPart && inventoryPart.stock > 0) {
+                            await onUpdatePart(sp.part_id, { stock: Math.max(0, inventoryPart.stock - qty) });
+                        }
                     }
                 }
             }
@@ -214,7 +240,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                             <input
                                                 type="number"
                                                 className="w-full px-4 py-3.5 rounded-2xl border-2 border-zinc-100 focus:border-blue-500 outline-none transition-all font-black text-lg pr-12 bg-white disabled:opacity-50 group-hover:border-blue-100"
-                                                value={mileage}
+                                                value={mileage || ''}
                                                 onChange={e => setMileage(Number(e.target.value))}
                                                 disabled={isFinalized}
                                             />
@@ -279,6 +305,17 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                                 disabled={isFinalized}
                                             />
                                         </div>
+                                        <div className="w-20 relative">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                placeholder="Cant."
+                                                className="w-full px-3 py-3 rounded-xl border border-zinc-100 hover:border-zinc-200 focus:border-emerald-500 outline-none transition-all text-sm font-bold text-center bg-zinc-50/50"
+                                                value={service.cantidad ?? ''}
+                                                onChange={(e) => handleServiceChange(index, 'cantidad', e.target.value)}
+                                                disabled={isFinalized}
+                                            />
+                                        </div>
                                         <div className="w-32 relative">
                                             <input
                                                 type="number"
@@ -337,32 +374,40 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                             {filteredInventory.length === 0 ? (
                                                 <div className="p-3 text-xs text-zinc-400 text-center italic">Sin resultados en inventario</div>
                                             ) : (
-                                                filteredInventory.map(part => (
-                                                    <button
-                                                        key={part.id}
-                                                        type="button"
-                                                        disabled={part.stock === 0}
-                                                        onClick={() => handleSelectInventoryPart(part)}
-                                                        className={cn(
-                                                            "w-full flex items-center justify-between px-4 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-zinc-50 last:border-0",
-                                                            part.stock === 0 && "opacity-40 cursor-not-allowed"
-                                                        )}
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <Package className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                                                            <span className="text-sm font-medium text-zinc-800">{part.name}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-3 shrink-0 ml-2">
-                                                            <span className={cn(
-                                                                "text-[10px] font-bold px-1.5 py-0.5 rounded-md",
-                                                                part.stock === 0 ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-700"
-                                                            )}>
-                                                                {part.stock === 0 ? 'Sin stock' : `${part.stock} u.`}
-                                                            </span>
-                                                            <span className="text-xs font-black text-zinc-600">${part.price.toLocaleString('es-CL')}</span>
-                                                        </div>
-                                                    </button>
-                                                ))
+                                                filteredInventory.map(part => {
+                                                    const isLabor = part.name.toUpperCase().includes('M.O.') || 
+                                                                    part.name.toLowerCase().includes('mano de obra');
+                                                    const isOutOfStock = part.stock === 0 && !isLabor;
+                                                    return (
+                                                        <button
+                                                            key={part.id}
+                                                            type="button"
+                                                            disabled={isOutOfStock}
+                                                            onClick={() => handleSelectInventoryPart(part)}
+                                                            className={cn(
+                                                                "w-full flex items-center justify-between px-4 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-zinc-50 last:border-0",
+                                                                isOutOfStock && "opacity-40 cursor-not-allowed"
+                                                            )}
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <Package className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                                                <div>
+                                                                    <span className="text-sm font-medium text-zinc-800">{part.name}</span>
+                                                                    <div className="text-[9px] text-zinc-400 font-bold uppercase tracking-tighter">ID: {part.id}</div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-3 shrink-0 ml-2">
+                                                                <span className={cn(
+                                                                    "text-[10px] font-bold px-1.5 py-0.5 rounded-md",
+                                                                    part.stock === 0 ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-700"
+                                                                )}>
+                                                                    {part.stock === 0 ? 'Sin stock' : `${part.stock} u.`}
+                                                                </span>
+                                                                <span className="text-xs font-black text-zinc-600">${part.price.toLocaleString('es-CL')}</span>
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                })
                                             )}
                                         </div>
                                     )}
@@ -391,6 +436,22 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                                 value={part.descripcion}
                                                 onChange={(e) => handleSparePartChange(index, 'descripcion', e.target.value)}
                                                 disabled={isFinalized || !!part.part_id}
+                                            />
+                                            {part.part_id && (
+                                                <div className="absolute -top-1.5 -left-1 px-1.5 py-0.5 bg-blue-500 text-[8px] font-black text-white rounded-md uppercase tracking-widest shadow-sm">
+                                                    Link Inventario
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="w-20 relative">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                placeholder="Cant."
+                                                className="w-full px-3 py-3 rounded-xl border border-zinc-100 hover:border-zinc-200 focus:border-blue-500 outline-none transition-all text-sm font-bold text-center bg-zinc-50/50"
+                                                value={part.cantidad ?? ''}
+                                                onChange={(e) => handleSparePartChange(index, 'cantidad', e.target.value)}
+                                                disabled={isFinalized}
                                             />
                                         </div>
                                         <div className="w-32 relative">

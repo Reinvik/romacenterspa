@@ -319,10 +319,37 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
               <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100 flex flex-col h-full">
                 <div className="flex items-center gap-2 mb-4 text-zinc-900 font-bold">
                   <Package className="w-5 h-5 text-zinc-500" />
-                  Repuestos Aplicados
+                  Repuestos y Materiales
                 </div>
                 <div className="flex-1">
-                  {displayTicket.parts_needed && displayTicket.parts_needed.length > 0 ? (
+                  {displayTicket.spare_parts && displayTicket.spare_parts.length > 0 ? (
+                    <div className="space-y-3">
+                      {displayTicket.spare_parts.map((part, idx) => (
+                        <div key={idx} className="flex justify-between items-center group">
+                          <div className="flex items-start gap-3">
+                            <div className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                            <span className="text-sm text-zinc-600 font-medium">
+                              {part.descripcion}
+                              {part.cantidad && part.cantidad > 1 && (
+                                <span className="ml-2 text-xs font-bold text-zinc-400">x{part.cantidad}</span>
+                              )}
+                            </span>
+                          </div>
+                          <span className="text-sm font-bold text-zinc-900">
+                            ${((part.costo || 0) * (part.cantidad || 1)).toLocaleString('es-CL')}
+                          </span>
+                        </div>
+                      ))}
+                      <div className="pt-3 border-t border-zinc-100 flex justify-end">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-zinc-400 uppercase">Total Repuestos</span>
+                          <div className="text-sm font-black text-zinc-900">
+                            ${displayTicket.spare_parts.reduce((acc, curr) => acc + (curr.costo || 0) * (curr.cantidad || 1), 0).toLocaleString('es-CL')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : displayTicket.parts_needed && displayTicket.parts_needed.length > 0 ? (
                     <ul className="space-y-2">
                       {displayTicket.parts_needed.map((part, idx) => (
                         <li key={idx} className="text-sm text-zinc-600 flex items-center gap-2">
@@ -355,10 +382,15 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
                       <div key={idx} className="flex justify-between items-center group">
                         <div className="flex items-start gap-3">
                           <div className="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-400 group-hover:scale-125 transition-transform"></div>
-                          <span className="text-sm text-zinc-600 font-medium">{service.descripcion}</span>
+                          <span className="text-sm text-zinc-600 font-medium">
+                            {service.descripcion}
+                            {service.cantidad && service.cantidad > 1 && (
+                              <span className="ml-2 text-xs font-bold text-emerald-500/60">x{service.cantidad}</span>
+                            )}
+                          </span>
                         </div>
                         <span className="text-sm font-bold text-zinc-900">
-                          ${service.costo ? service.costo.toLocaleString('es-CL') : '0'}
+                          ${((service.costo || 0) * (service.cantidad || 1)).toLocaleString('es-CL')}
                         </span>
                       </div>
                     ))}
@@ -366,7 +398,7 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
                       <div className="flex items-center gap-3">
                         <span className="text-xs font-bold text-zinc-400 uppercase">Total Servicios</span>
                         <div className="text-lg font-black text-emerald-600">
-                          ${displayTicket.services.reduce((acc, curr) => acc + (curr.costo || 0), 0).toLocaleString('es-CL')}
+                          ${displayTicket.services.reduce((acc, curr) => acc + (curr.costo || 0) * (curr.cantidad || 1), 0).toLocaleString('es-CL')}
                         </div>
                       </div>
                     </div>
@@ -442,7 +474,10 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
                       <div className="text-right">
                         <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Inversión</p>
                         <p className="text-xl font-black text-zinc-900">
-                           ${(histTicket.services?.reduce((acc, s) => acc + (s.costo || 0), 0) || 0).toLocaleString('es-CL')}
+                           ${(
+                             (histTicket.services?.reduce((acc, s) => acc + (s.costo || 0) * (s.cantidad || 1), 0) || 0) + 
+                             (histTicket.spare_parts?.reduce((acc, s) => acc + (s.costo || 0) * (s.cantidad || 1), 0) || 0)
+                           ).toLocaleString('es-CL')}
                         </p>
                       </div>
                     </div>
@@ -463,8 +498,13 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
                            <ul className="space-y-1.5">
                              {histTicket.services.map((s, si) => (
                                <li key={si} className="text-xs text-zinc-600 flex justify-between">
-                                 <span className="font-medium">• {s.descripcion}</span>
-                                 <span className="text-zinc-400 font-bold">${(s.costo || 0).toLocaleString('es-CL')}</span>
+                                 <span className="font-medium">
+                                   • {s.descripcion}
+                                   {s.cantidad && s.cantidad > 1 && (
+                                     <span className="ml-1 text-[10px] font-bold text-zinc-400">x{s.cantidad}</span>
+                                   )}
+                                 </span>
+                                 <span className="text-zinc-400 font-bold">${((s.costo || 0) * (s.cantidad || 1)).toLocaleString('es-CL')}</span>
                                </li>
                              ))}
                            </ul>

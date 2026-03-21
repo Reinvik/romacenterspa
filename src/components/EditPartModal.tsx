@@ -11,6 +11,7 @@ interface EditPartModalProps {
 
 export function EditPartModal({ isOpen, onClose, part, onUpdate }: EditPartModalProps) {
     const [formData, setFormData] = useState({
+        id: '',
         name: '',
         stock: 0,
         min_stock: 0,
@@ -21,6 +22,7 @@ export function EditPartModal({ isOpen, onClose, part, onUpdate }: EditPartModal
     useEffect(() => {
         if (part) {
             setFormData({
+                id: part.id,
                 name: part.name,
                 stock: part.stock,
                 min_stock: part.min_stock,
@@ -59,12 +61,28 @@ export function EditPartModal({ isOpen, onClose, part, onUpdate }: EditPartModal
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     <div className="space-y-2">
                         <label className="text-sm font-semibold text-zinc-700 flex items-center gap-2">
-                            <Package className="w-4 h-4 text-zinc-400" />
-                            Nombre del Repuesto
+                            <Hash className="w-4 h-4 text-zinc-400" />
+                            ID / Código
                         </label>
                         <input
                             required
                             type="text"
+                            placeholder="Ej: ACE-001"
+                            className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-zinc-800 font-sans font-mono"
+                            value={formData.id}
+                            onChange={e => setFormData({ ...formData, id: e.target.value.toUpperCase() })}
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold text-zinc-700 flex items-center gap-2">
+                            <Package className="w-4 h-4 text-zinc-400" />
+                            Nombre del Item
+                        </label>
+                        <input
+                            required
+                            type="text"
+                            placeholder="Ej: Filtro de Aceite"
                             className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-zinc-800 font-sans"
                             value={formData.name}
                             onChange={e => setFormData({ ...formData, name: e.target.value })}

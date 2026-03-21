@@ -28,7 +28,7 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     notes: '',
     mileage: 0,
     entry_date: format(new Date(), 'yyyy-MM-dd'),
-    services: [{ descripcion: '', costo: 0 }] as ServiceItem[],
+    services: [{ descripcion: '', costo: 0, cantidad: 1 }] as ServiceItem[],
     spare_parts: [] as ServiceItem[],
   });
 
@@ -98,30 +98,14 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     setFormData(prev => ({
       ...prev,
       id: ('vehicles' in customer ? customer.vehicles?.[0] : customer.id) || prev.id,
-      owner_name: 'name' in customer ? customer.name : customer.owner_name,
-      owner_phone: 'phone' in customer ? customer.phone : customer.owner_phone,
-      mileage: ('last_mileage' in customer ? customer.last_mileage : (customer as Ticket).mileage) || prev.mileage,
-      model: ('last_model' in customer ? customer.last_model : (customer as Ticket).model) || prev.model
+      owner_name: ('name' in customer ? customer.name : customer.owner_name) || prev.owner_name,
+      owner_phone: ('phone' in customer ? customer.phone : customer.owner_phone) || prev.owner_phone,
+      model: ('last_model' in customer ? customer.last_model : (customer as Ticket).model) || prev.model,
     }));
-    setCustomerSearch('phone' in customer ? customer.phone : (customer as Ticket).owner_phone);
     setIsCustomerFilled(true);
+    setCustomerSearch('');
     setShowCustomerSearch(false);
   };
-
-  useEffect(() => {
-    if (formData.model.length > 1) {
-      const match = CAR_BRANDS.find(b => formData.model.toLowerCase().includes(b.toLowerCase()));
-      if (match) {
-        setBrandSearch(match);
-        setModelSuggestions(CAR_MODELS[match] || []);
-        setShowSuggestions(true);
-      } else {
-        setShowSuggestions(false);
-      }
-    } else {
-      setShowSuggestions(false);
-    }
-  }, [formData.model]);
 
   const filteredInventory = useMemo(() => {
     const search = partSearch.toLowerCase();
@@ -134,56 +118,35 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
   }, [partSearch, parts, formData.spare_parts]);
 
   const handleSelectInventoryPart = (part: Part) => {
-    setFormData(prev => ({
-      ...prev,
-      spare_parts: [...prev.spare_parts, {
-        descripcion: part.name,
-        costo: part.price,
-        part_id: part.id
-      }]
-    }));
+    const isLabor = part.name.toUpperCase().includes('M.O.') || 
+                    part.name.toLowerCase().includes('mano de obra');
+    
+    const newItem = {
+      descripcion: part.name,
+      costo: part.price,
+      cantidad: 1,
+      part_id: part.id
+    };
+
+    if (isLabor) {
+      setFormData(prev => ({
+        ...prev,
+        services: [...prev.services.filter(s => s.descripcion || s.costo), newItem]
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        spare_parts: [...prev.spare_parts, newItem]
+      }));
+    }
     setPartSearch('');
     setShowPartDropdown(false);
-  };
-
-  if (!isOpen) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    onAdd(formData);
-
-    // Deduct stock for inventory parts
-    if (onUpdatePart && formData.spare_parts.length > 0) {
-      for (const sp of formData.spare_parts) {
-        if (sp.part_id) {
-          const inventoryPart = parts.find(p => p.id === sp.part_id);
-          if (inventoryPart && inventoryPart.stock > 0) {
-            await onUpdatePart(sp.part_id, { stock: inventoryPart.stock - 1 });
-          }
-        }
-      }
-    }
-
-    onClose();
-    setFormData({
-      id: '',
-      model: '',
-      status: 'Ingresado',
-      mechanic_id: 'Sin asignar',
-      owner_name: '',
-      owner_phone: '',
-      notes: '',
-      mileage: 0,
-      entry_date: format(new Date(), 'yyyy-MM-dd'),
-      services: [{ descripcion: '', costo: 0 }],
-      spare_parts: [],
-    });
   };
 
   const handleAddService = () => {
     setFormData(prev => ({
       ...prev,
-      services: [...prev.services, { descripcion: '', costo: 0 }]
+      services: [...prev.services, { descripcion: '', costo: 0, cantidad: 1 }]
     }));
   };
 
@@ -196,10 +159,11 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
 
   const handleServiceChange = (index: number, field: keyof ServiceItem, value: string | number) => {
     const newServices = [...formData.services];
-    if (field === 'costo') {
-      newServices[index][field] = Number(value);
+    if (field === 'costo' || field === 'cantidad') {
+      const numVal = Number(value);
+      newServices[index][field] = isNaN(numVal) ? 0 : numVal;
     } else {
-      newServices[index][field] = value as string;
+      (newServices[index] as any)[field] = value as string;
     }
     setFormData(prev => ({ ...prev, services: newServices }));
   };
@@ -207,7 +171,7 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
   const handleAddSparePart = () => {
     setFormData(prev => ({
       ...prev,
-      spare_parts: [...prev.spare_parts, { descripcion: '', costo: 0 }]
+      spare_parts: [...prev.spare_parts, { descripcion: '', costo: 0, cantidad: 1 }]
     }));
   };
 
@@ -220,17 +184,53 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
 
   const handleSparePartChange = (index: number, field: keyof ServiceItem, value: string | number) => {
     const newParts = [...formData.spare_parts];
-    if (field === 'costo') {
-      newParts[index][field] = Number(value);
+    if (field === 'costo' || field === 'cantidad') {
+      const numVal = Number(value);
+      newParts[index][field] = isNaN(numVal) ? 0 : numVal;
     } else {
-      newParts[index][field] = value as string;
+      (newParts[index] as any)[field] = value as string;
     }
     setFormData(prev => ({ ...prev, spare_parts: newParts }));
   };
 
-  const totalServicesCost = formData.services.reduce((acc, curr) => acc + (curr.costo || 0), 0);
-  const totalSparePartsCost = formData.spare_parts.reduce((acc, curr) => acc + (curr.costo || 0), 0);
+  const totalServicesCost = formData.services.reduce((acc, curr) => acc + (curr.costo || 0) * (curr.cantidad ?? 1), 0);
+  const totalSparePartsCost = formData.spare_parts.reduce((acc, curr) => acc + (curr.costo || 0) * (curr.cantidad ?? 1), 0);
   const totalEstimatedCost = totalServicesCost + totalSparePartsCost;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Preparar el ticket para enviar
+    const ticketToSubmit = {
+      ...formData,
+      total_estimated_cost: totalEstimatedCost,
+      spare_parts: formData.spare_parts // Asegurar que pasamos spare_parts
+    };
+
+    // Actualizar stock solo para repuestos vinculados que NO son mano de obra
+    if (onUpdatePart) {
+        const allItems = [...formData.services, ...formData.spare_parts];
+        for (const item of allItems) {
+            if (item.part_id) {
+                const isLabor = item.descripcion.toUpperCase().includes('M.O.') || 
+                                item.descripcion.toLowerCase().includes('mano de obra');
+                
+                if (isLabor) continue;
+
+                const part = parts.find(p => p.id === item.part_id);
+                const qty = item.cantidad ?? 1;
+                if (part && part.stock > 0) {
+                    await onUpdatePart(item.part_id, { stock: Math.max(0, part.stock - qty) });
+                }
+            }
+        }
+    }
+
+    onAdd(ticketToSubmit);
+    onClose();
+  };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -291,36 +291,22 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-8">
-          {/* Sección 1: Datos del Vehículo */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-8">
+          {/* Sección 1: Datos Básicos */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-1.5 h-6 rounded-full" style={{ backgroundColor: primaryColor }}></div>
-              <h3 className="text-base font-black text-zinc-900 uppercase tracking-widest">Ficha Técnica del Vehículo</h3>
+              <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
+              <h3 className="text-sm font-black text-zinc-900 uppercase tracking-widest">Información Principal</h3>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Fecha de Ingreso</label>
-                <input
-                  required
-                  type="date"
-                  className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none transition-all font-bold text-zinc-800 focus:ring-4"
-                  style={{ 
-                    borderColor: primaryColor,
-                    boxShadow: `0 0 0 4px ${primaryColor}15`
-                  }}
-                  value={formData.entry_date}
-                  onChange={e => setFormData({ ...formData, entry_date: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Patente / ID</label>
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Patente (ID)</label>
                 <input
                   required
                   type="text"
-                  placeholder="AB·CD·12"
-                  className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none transition-all font-mono font-black uppercase text-lg bg-zinc-50/30 focus:ring-4"
+                  placeholder="ABCD12"
+                  className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none transition-all font-black text-zinc-800 tracking-widest uppercase bg-zinc-50/30 focus:ring-4"
                   style={{ 
                     borderColor: formData.id ? primaryColor : undefined,
                     boxShadow: formData.id ? `0 0 0 4px ${primaryColor}15` : undefined
@@ -329,55 +315,49 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
                   onChange={e => setFormData({ ...formData, id: e.target.value.toUpperCase() })}
                 />
               </div>
+
               <div className="space-y-2 relative">
                 <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Marca y Modelo</label>
-                <div className="relative group">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-300 transition-colors" style={{ color: formData.model ? primaryColor : undefined }} />
-                  <input
-                    required
-                    list="car-suggestions"
-                    type="text"
-                    placeholder="Eje: Toyota Yaris"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 outline-none transition-all font-bold text-zinc-800 focus:ring-4"
-                    style={{ 
-                      borderColor: formData.model ? primaryColor : undefined,
-                      boxShadow: formData.model ? `0 0 0 4px ${primaryColor}15` : undefined
-                    }}
-                    value={formData.model}
-                    onChange={e => {
-                        const val = e.target.value;
-                        setFormData({ ...formData, model: val });
-                        
-                        // Si el usuario borra todo, reseteamos marca
-                        if (!val) {
-                            setBrandSearch('');
-                            return;
-                        }
-
-                        // Intentar detectar marca si aún no hay una fija
-                        const match = CAR_BRANDS.find(b => val.toLowerCase().startsWith(b.toLowerCase()));
-                        if (match) {
-                            setBrandSearch(match);
-                        }
-                    }}
-                  />
-                  <datalist id="car-suggestions">
-                    {/* 1. Si no hay marca detectada, mostrar marcas principales */}
-                    {!brandSearch && CAR_BRANDS.map(brand => (
-                      <option key={brand} value={brand} />
+                <input
+                  required
+                  type="text"
+                  placeholder="Toyota Hilux 2024"
+                  className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none transition-all font-bold text-zinc-800 bg-zinc-50/30 focus:ring-4"
+                  style={{ 
+                    borderColor: formData.model ? primaryColor : undefined,
+                    boxShadow: formData.model ? `0 0 0 4px ${primaryColor}15` : undefined
+                  }}
+                  value={formData.model}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setFormData({ ...formData, model: val });
+                    setShowSuggestions(val.length > 0);
+                  }}
+                  onFocus={() => setShowSuggestions(formData.model.length > 0)}
+                />
+                
+                {showSuggestions && (modelSuggestions.length > 0 || systemModels.length > 0) && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto">
+                    {brandSearch && (
+                      <div className="px-3 py-1.5 bg-zinc-50 text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b border-zinc-100">
+                        Modelos de {brandSearch}
+                      </div>
+                    )}
+                    {modelSuggestions.map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          setFormData({ ...formData, model: `${brandSearch} ${m}` });
+                          setShowSuggestions(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm font-bold text-zinc-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                      >
+                        {m}
+                      </button>
                     ))}
-                    
-                    {/* 2. Si hay marca detectada, mostrar sus modelos */}
-                    {brandSearch && CAR_MODELS[brandSearch]?.map(model => (
-                      <option key={model} value={`${brandSearch} ${model}`} />
-                    ))}
-                    
-                    {/* 3. Sugerencias históricas del sistema */}
-                    {systemModels.slice(0, 5).map(m => (
-                      <option key={m} value={m} />
-                    ))}
-                  </datalist>
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -430,8 +410,8 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
                   <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Teléfono WhatsApp</label>
                   <input
                     required
-                    type="tel"
-                    placeholder="+56 9..."
+                    type="text"
+                    placeholder="+56 9 ..."
                     className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none transition-all font-bold bg-zinc-50/30 focus:ring-4"
                     style={{ 
                       borderColor: formData.owner_phone ? primaryColor : undefined,
@@ -493,7 +473,7 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
                     key={idx}
                     type="button"
                     onClick={() => {
-                      const newService = { descripcion: action.desc, costo: action.price };
+                      const newService = { descripcion: action.desc, costo: action.price, cantidad: 1 };
                       if (formData.services.length === 1 && !formData.services[0].descripcion) {
                         setFormData({ ...formData, services: [newService] });
                       } else {
@@ -511,7 +491,7 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
             <div className="space-y-3">
               {formData.services.map((service, index) => (
                 <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-7">
+                  <div className="col-span-6">
                     <input
                       type="text"
                       placeholder="Descripción del servicio"
@@ -520,7 +500,17 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
                       onChange={(e) => handleServiceChange(index, 'descripcion', e.target.value)}
                     />
                   </div>
-                  <div className="col-span-4 relative">
+                  <div className="col-span-2 relative">
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Cant."
+                      className="w-full px-2 py-2 rounded-lg border border-zinc-200 focus:border-emerald-400 outline-none transition-all text-sm font-bold text-center bg-white"
+                      value={service.cantidad ?? ''}
+                      onChange={(e) => handleServiceChange(index, 'cantidad', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-3 relative">
                     <input
                       type="number"
                       placeholder="Costo"
@@ -587,35 +577,40 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
 
               {showPartDropdown && filteredInventory.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto">
-                  {filteredInventory.map(part => (
-                    <button
-                      key={part.id}
-                      type="button"
-                      disabled={part.stock === 0}
-                      onClick={() => handleSelectInventoryPart(part)}
-                      className={cn(
-                        "w-full flex items-center justify-between px-4 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-zinc-50 last:border-0",
-                        part.stock === 0 && "opacity-40 cursor-not-allowed"
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Package className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                        <div>
+                  {filteredInventory.map(part => {
+                    const isLabor = part.name.toUpperCase().includes('M.O.') || 
+                                    part.name.toLowerCase().includes('mano de obra');
+                    const isOutOfStock = part.stock === 0 && !isLabor;
+                    return (
+                      <button
+                        key={part.id}
+                        type="button"
+                        disabled={isOutOfStock}
+                        onClick={() => handleSelectInventoryPart(part)}
+                        className={cn(
+                          "w-full flex items-center justify-between px-4 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-zinc-50 last:border-0",
+                          isOutOfStock && "opacity-40 cursor-not-allowed"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Package className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                          <div>
                             <span className="text-sm font-medium text-zinc-800">{part.name}</span>
                             <div className="text-[9px] text-zinc-400 font-bold uppercase tracking-tighter">ID: {part.id}</div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0 ml-2">
-                        <span className={cn(
-                          "text-[10px] font-bold px-1.5 py-0.5 rounded-md",
-                          part.stock === 0 ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-700"
-                        )}>
-                          {part.stock === 0 ? 'Sin stock' : `${part.stock} u.`}
-                        </span>
-                        <span className="text-xs font-black text-zinc-600">${part.price.toLocaleString('es-CL')}</span>
-                      </div>
-                    </button>
-                  ))}
+                        <div className="flex items-center gap-3 shrink-0 ml-2">
+                          <span className={cn(
+                            "text-[10px] font-bold px-1.5 py-0.5 rounded-md",
+                            part.stock === 0 ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-700"
+                          )}>
+                            {part.stock === 0 ? 'Sin stock' : `${part.stock} u.`}
+                          </span>
+                          <span className="text-xs font-black text-zinc-600">${part.price.toLocaleString('es-CL')}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -627,24 +622,32 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
                 </p>
               )}
               {formData.spare_parts.map((part, index) => (
-                <div key={index} className="grid grid-cols-12 gap-2 items-center animate-in slide-in-from-left-2 duration-200">
-                  <div className="col-span-7 relative">
-                    {part.part_id && (
-                      <Package className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-400 pointer-events-none" />
-                    )}
+                <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-6 relative">
                     <input
                       type="text"
                       placeholder="Descripción del repuesto"
-                      className={cn(
-                        "w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-blue-500 outline-none transition-all text-sm bg-white",
-                        part.part_id && "pl-8 text-blue-700 bg-blue-50/30 border-blue-100"
-                      )}
+                      className="w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-blue-500 outline-none transition-all text-sm bg-white"
                       value={part.descripcion}
                       onChange={(e) => handleSparePartChange(index, 'descripcion', e.target.value)}
-                      disabled={!!part.part_id}
+                    />
+                    {part.part_id && (
+                        <div className="absolute -top-1.5 -left-1 px-1.5 py-0.5 bg-blue-500 text-[8px] font-black text-white rounded-md uppercase tracking-widest shadow-sm">
+                            Link Inventario
+                        </div>
+                    )}
+                  </div>
+                  <div className="col-span-2 relative">
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Cant."
+                      className="w-full px-2 py-2 rounded-lg border border-zinc-200 focus:border-blue-400 outline-none transition-all text-sm font-bold text-center bg-white"
+                      value={part.cantidad ?? ''}
+                      onChange={(e) => handleSparePartChange(index, 'cantidad', e.target.value)}
                     />
                   </div>
-                  <div className="col-span-4 relative">
+                  <div className="col-span-3 relative">
                     <input
                       type="number"
                       placeholder="Costo"
@@ -673,13 +676,13 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
               className="flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 transition-colors py-1"
             >
               <PlusCircle className="w-4 h-4" />
-              Agregar otro repuesto
+              Agregar repuesto manual
             </button>
 
             <div className="pt-2 flex justify-end">
-              <div className="bg-zinc-900 px-4 py-2 rounded-xl border border-zinc-100 flex items-center gap-3">
-                <span className="text-[10px] font-black text-zinc-500 uppercase">Total Inversión Estimada</span>
-                <span className="text-sm font-black text-white">
+              <div className="bg-zinc-50 px-4 py-2 rounded-xl border border-zinc-100 flex items-center gap-3">
+                <span className="text-[10px] font-black text-zinc-400 uppercase">Total Estimado</span>
+                <span className="text-sm font-black text-emerald-600">
                   ${totalEstimatedCost.toLocaleString('es-CL')}
                 </span>
               </div>
@@ -699,7 +702,6 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
               className="px-8 py-3 text-sm font-black text-white rounded-xl transition-all shadow-lg active:scale-95 flex items-center gap-2"
               style={{ 
                   backgroundColor: primaryColor,
-                  shadowColor: `${primaryColor}40`
               }}
             >
               Registrar Vehículo

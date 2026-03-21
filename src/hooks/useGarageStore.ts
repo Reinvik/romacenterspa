@@ -421,12 +421,45 @@ export function useGarageStore(companyId?: string) {
     }
   };
 
+  const deletePart = async (id: string) => {
+    try {
+      const { error } = await supabaseGarage.from('garage_parts').delete().eq('id', id);
+      if (error) throw error;
+      await fetchData();
+    } catch (error) {
+      console.error('Error deleting part:', error);
+      throw error;
+    }
+  };
+
   const updatePart = async (partId: string, updates: Partial<Part>) => {
     try {
-      const { error } = await supabaseGarage.from('garage_parts')
-        .update(updates)
-        .eq('id', partId);
-      if (error) throw error;
+      // Si el ID cambió, Supabase no permite actualizar la PK directamente de forma sencilla si hay FKs (aunque aquí no hay FKs estrictas en el schema public, mejor manejarlo como delete/insert para seguridad).
+      if (updates.id && updates.id !== partId) {
+        // 1. Obtener datos actuales
+        const { data: currentPart } = await supabaseGarage.from('garage_parts').select('*').eq('id', partId).single();
+        if (!currentPart) throw new Error('Repuesto no encontrado');
+
+        // 2. Insertar nuevo con el nuevo ID
+        const { error: insError } = await supabaseGarage.from('garage_parts').insert([{
+           ...currentPart,
+           ...updates,
+           id: updates.id
+        }]);
+        if (insError) throw insError;
+
+        // 3. Eliminar el viejo
+        const { error: delError } = await supabaseGarage.from('garage_parts').delete().eq('id', partId);
+        if (delError) {
+            // Si falla el borrado, al menos tenemos el nuevo, pero intentamos limpiar
+            console.error('Error deleting old part after ID change:', delError);
+        }
+      } else {
+        const { error } = await supabaseGarage.from('garage_parts')
+          .update(updates)
+          .eq('id', partId);
+        if (error) throw error;
+      }
       await fetchData();
     } catch (error) {
       console.error('Error updating part:', error);
@@ -436,14 +469,6 @@ export function useGarageStore(companyId?: string) {
 
   const updateTicket = async (ticketId: string, updates: Partial<Ticket>) => {
     try {
-      // 1. Obtener el estado actual del ticket para comparar repuestos
-      const { data: currentTicket, error: fetchError } = await supabaseGarage.from('garage_tickets')
-        .select('parts_needed')
-        .eq('id', ticketId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
       const dbUpdates: any = {
         last_status_change: new Date().toISOString()
       };
@@ -453,7 +478,6 @@ export function useGarageStore(companyId?: string) {
       if (updates.model !== undefined) dbUpdates.model = updates.model;
       if (updates.owner_name !== undefined) dbUpdates.owner_name = updates.owner_name;
       if (updates.owner_phone !== undefined) dbUpdates.owner_phone = updates.owner_phone;
-      if (updates.parts_needed !== undefined) dbUpdates.parts_needed = updates.parts_needed;
       if (updates.close_date !== undefined) dbUpdates.close_date = updates.close_date;
       if (updates.quotation_total !== undefined) dbUpdates.quotation_total = updates.quotation_total;
       if (updates.quotation_accepted !== undefined) dbUpdates.quotation_accepted = updates.quotation_accepted;
@@ -462,28 +486,10 @@ export function useGarageStore(companyId?: string) {
       if (updates.mileage !== undefined) dbUpdates.mileage = updates.mileage;
       if (updates.job_photos !== undefined) dbUpdates.job_photos = updates.job_photos;
       if (updates.services !== undefined) dbUpdates.services = updates.services;
+      if (updates.spare_parts !== undefined) dbUpdates.spare_parts = updates.spare_parts;
 
       if (updates.mechanic_id !== undefined) {
         dbUpdates.mechanic = updates.mechanic_id === 'Sin asignar' ? null : updates.mechanic_id;
-      }
-
-      // 2. Lógica de deducción de stock
-      if (updates.parts_needed) {
-        const oldParts = currentTicket.parts_needed || [];
-        const newParts = updates.parts_needed;
-
-        // Encontrar repuestos recién añadidos
-        const addedParts = newParts.filter(p => !oldParts.includes(p));
-
-        for (const partName of addedParts) {
-          // Buscar el repuesto por nombre en el inventario actual (cargado en el store)
-          const partToUpdate = parts.find(p => p.name === partName);
-          if (partToUpdate && partToUpdate.stock > 0) {
-            await supabaseGarage.from('garage_parts')
-              .update({ stock: partToUpdate.stock - 1 })
-              .eq('id', partToUpdate.id);
-          }
-        }
       }
 
       const { error } = await supabaseGarage.from('garage_tickets')
@@ -662,6 +668,7 @@ export function useGarageStore(companyId?: string) {
     deleteMechanic,
     addPart,
     updatePart,
+    deletePart,
     addCustomer,
     updateCustomer,
     deleteCustomer,

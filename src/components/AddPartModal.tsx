@@ -39,7 +39,7 @@ export function AddPartModal({ isOpen, onClose, onAdd }: AddPartModalProps) {
                 <div className="flex justify-between items-center p-6 border-b border-zinc-100">
                     <div className="flex items-center gap-2">
                         <PackagePlus className="w-5 h-5 text-emerald-600" />
-                        <h2 className="text-xl font-bold tracking-tight text-zinc-900">Nuevo Repuesto</h2>
+                        <h2 className="text-xl font-bold tracking-tight text-zinc-900">Nuevo Item</h2>
                     </div>
                     <button onClick={onClose} className="p-2 text-zinc-400 hover:text-zinc-600 rounded-full hover:bg-zinc-100 transition-colors">
                         <X className="w-5 h-5" />
@@ -48,11 +48,11 @@ export function AddPartModal({ isOpen, onClose, onAdd }: AddPartModalProps) {
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     <div className="space-y-2">
-                        <label className="text-sm font-semibold text-zinc-700">SKU / ID</label>
+                        <label className="text-sm font-semibold text-zinc-700">ID / Código</label>
                         <input
                             required
                             type="text"
-                            placeholder="P123"
+                            placeholder="Ej: ACE-001 o M.O. CAMBIO ACEITE"
                             className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all font-mono"
                             value={formData.id}
                             onChange={e => setFormData({ ...formData, id: e.target.value.toUpperCase() })}
@@ -60,15 +60,16 @@ export function AddPartModal({ isOpen, onClose, onAdd }: AddPartModalProps) {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-semibold text-zinc-700">Nombre del Repuesto</label>
+                        <label className="text-sm font-semibold text-zinc-700">Nombre del Item</label>
                         <input
                             required
                             type="text"
-                            placeholder="Ej: Filtro de Aire"
+                            placeholder="Ej: Filtro de Aire o M.O. Diagnóstico"
                             className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
                             value={formData.name}
                             onChange={e => setFormData({ ...formData, name: e.target.value })}
                         />
+                        <p className="text-[10px] text-zinc-400 mt-1">Tip: Use "M.O." en el nombre para categorizar como Mano de Obra.</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

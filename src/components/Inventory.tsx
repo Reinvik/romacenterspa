@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Part, GarageSettings } from '../types';
-import { Package, AlertTriangle, Plus, Search } from 'lucide-react';
+import { Package, AlertTriangle, Plus, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Wrench } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { AddPartModal } from './AddPartModal';
 import { EditPartModal } from './EditPartModal';
@@ -10,41 +10,100 @@ interface InventoryProps {
   settings: GarageSettings | null;
   onAddPart: (part: any) => Promise<void>;
   onUpdatePart: (id: string, updates: Partial<Part>) => Promise<void>;
+  onDeletePart: (id: string) => Promise<void>;
 }
 
-export function Inventory({ parts, settings, onAddPart, onUpdatePart }: InventoryProps) {
+type SortField = 'id' | 'name' | 'stock' | 'price';
+type SortDirection = 'asc' | 'desc';
+
+export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePart }: InventoryProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<Part | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'alerts'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'labor' | 'alerts'>('all');
+  const [sortConfig, setSortConfig] = useState<{ field: SortField; direction: SortDirection }>({
+    field: 'name',
+    direction: 'asc'
+  });
 
   const handleEdit = (part: Part) => {
     setSelectedPart(part);
     setIsEditModalOpen(true);
   };
 
-  const filteredParts = parts.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.id && p.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (p.assigned_to && p.assigned_to.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const handleDelete = async (id: string) => {
+    if (window.confirm('¿Está seguro de que desea eliminar este repuesto del inventario?')) {
+      try {
+        await onDeletePart(id);
+      } catch (error) {
+        alert('Error al eliminar el repuesto.');
+      }
+    }
+  };
+
+  const handleSort = (field: SortField) => {
+    setSortConfig(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const filteredParts = useMemo(() => {
+    let result = parts.filter(p => {
+      const searchMatch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.id && p.id.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const isLabor = p.name.toUpperCase().includes('M.O.') || 
+                      p.name.toLowerCase().includes('mano de obra');
+
+      if (activeTab === 'alerts') {
+        return searchMatch && p.stock <= p.min_stock;
+      }
+      
+      if (activeTab === 'labor') {
+        return searchMatch && isLabor;
+      }
+
+      // 'all' tab shows everything EXCEPT labor items (to keep them separated as requested)
+      return searchMatch && !isLabor;
+    });
+
+    // Sorting
+    result.sort((a, b) => {
+      const field = sortConfig.field;
+      const direction = sortConfig.direction === 'asc' ? 1 : -1;
+
+      if (field === 'price' || field === 'stock') {
+        return (a[field] - b[field]) * direction;
+      }
+      return (a[field] || '').localeCompare(b[field] || '') * direction;
+    });
+
+    return result;
+  }, [parts, searchTerm, activeTab, sortConfig]);
 
   const lowStockParts = parts.filter(p => p.stock <= p.min_stock);
+  const laborParts = parts.filter(p => p.name.toUpperCase().includes('M.O.') || p.name.toLowerCase().includes('mano de obra'));
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortConfig.field !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 ml-1" /> : <ArrowDown className="w-3 h-3 ml-1" />;
+  };
 
   return (
     <div className="space-y-6 font-sans">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-zinc-900">Inventario y Repuestos</h2>
-          <p className="text-zinc-500 mt-1">Gestiona el stock de piezas y asignaciones a vehículos.</p>
+          <p className="text-zinc-500 mt-1">Gestiona el stock de piezas y mano de obra.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-all shadow-sm active:scale-95"
         >
           <Plus className="w-5 h-5" />
-          Nuevo Repuesto
+          Nuevo Item
         </button>
       </div>
 
@@ -55,33 +114,48 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart }: Inventor
       />
 
       {/* Tabs Switcher */}
-      <div className="flex p-1 bg-zinc-100 rounded-xl w-fit">
+      <div className="flex p-1 bg-zinc-100 rounded-xl w-fit overflow-x-auto max-w-full">
         <button
           onClick={() => setActiveTab('all')}
           className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all",
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap",
             activeTab === 'all' 
               ? "bg-white text-zinc-900 shadow-sm" 
               : "text-zinc-500 hover:text-zinc-700"
           )}
         >
           <Package className="w-4 h-4" />
-          Todos los Repuestos
+          Repuestos
           <span className="ml-1 px-1.5 py-0.5 rounded-md bg-zinc-200 text-[10px] text-zinc-600">
-            {parts.length}
+            {parts.length - laborParts.length}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('labor')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap",
+            activeTab === 'labor' 
+              ? "bg-white text-zinc-900 shadow-sm" 
+              : "text-zinc-500 hover:text-zinc-700"
+          )}
+        >
+          <Wrench className="w-4 h-4 text-blue-500" />
+          Mano de Obra
+          <span className="ml-1 px-1.5 py-0.5 rounded-md bg-zinc-200 text-[10px] text-zinc-600">
+            {laborParts.length}
           </span>
         </button>
         <button
           onClick={() => setActiveTab('alerts')}
           className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all",
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap",
             activeTab === 'alerts' 
               ? "bg-amber-500 text-white shadow-sm" 
               : "text-zinc-500 hover:text-zinc-700"
           )}
         >
           <AlertTriangle className={cn("w-4 h-4", activeTab === 'alerts' ? "text-white" : "text-amber-500")} />
-          Alertas de Stock
+          Alertas
           {lowStockParts.length > 0 && (
             <span className={cn(
               "ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold",
@@ -94,14 +168,14 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart }: Inventor
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden">
-        {activeTab === 'all' ? (
+        {activeTab !== 'alerts' ? (
           <>
             <div className="p-4 border-b border-zinc-100 flex items-center gap-4 bg-zinc-50/50">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
                 <input
                   type="text"
-                  placeholder="Buscar por nombre, código o patente..."
+                  placeholder="Buscar por nombre o código..."
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-sm"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
@@ -114,7 +188,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart }: Inventor
               {filteredParts.length === 0 ? (
                 <div className="px-6 py-12 text-center">
                   <Package className="w-12 h-12 text-zinc-200 mx-auto mb-3" />
-                  <p className="text-zinc-500 font-medium">No se encontraron repuestos.</p>
+                  <p className="text-zinc-500 font-medium">No se encontraron ítems.</p>
                 </div>
               ) : (
                 filteredParts.map((part) => (
@@ -122,19 +196,27 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart }: Inventor
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
-                          <Package className="w-4 h-4 text-zinc-500" />
+                          {part.name.toUpperCase().includes('M.O.') ? <Wrench className="w-4 h-4 text-blue-500" /> : <Package className="w-4 h-4 text-zinc-500" />}
                         </div>
                         <div>
                           <h4 className="font-bold text-zinc-900 leading-tight">{part.name}</h4>
                           <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-tighter">ID: {part.id}</span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleEdit(part)}
-                        className="text-emerald-600 font-extrabold text-xs bg-emerald-50 px-3 py-1.5 rounded-lg active:scale-95 transition-transform"
-                      >
-                        Editar
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEdit(part)}
+                          className="text-emerald-600 font-extrabold text-xs bg-emerald-50 px-3 py-1.5 rounded-lg active:scale-95 transition-transform"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(part.id)}
+                          className="text-red-600 font-extrabold text-xs bg-red-50 px-2 py-1.5 rounded-lg active:scale-95 transition-transform"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 pt-1">
@@ -157,19 +239,6 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart }: Inventor
                         </p>
                       </div>
                     </div>
-
-                    <div className="flex items-center justify-between pt-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Asignado:</p>
-                        {part.assigned_to ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            {part.assigned_to}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-zinc-400 italic">Sin asignar</span>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 ))
               )}
@@ -180,20 +249,27 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart }: Inventor
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-zinc-50/80 border-b border-zinc-200 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                    <th className="px-6 py-4">ID / Código</th>
-                    <th className="px-6 py-4">Repuesto</th>
-                    <th className="px-6 py-4 text-right">Stock</th>
-                    <th className="px-6 py-4 text-right">Precio Unit.</th>
-                    <th className="px-6 py-4">Asignado</th>
+                    <th className="px-6 py-4 cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('id')}>
+                      <div className="flex items-center">ID / Código <SortIcon field="id" /></div>
+                    </th>
+                    <th className="px-6 py-4 cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('name')}>
+                      <div className="flex items-center">Nombre <SortIcon field="name" /></div>
+                    </th>
+                    <th className="px-6 py-4 text-right cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('stock')}>
+                      <div className="flex items-center justify-end">Stock <SortIcon field="stock" /></div>
+                    </th>
+                    <th className="px-6 py-4 text-right cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('price')}>
+                      <div className="flex items-center justify-end">Precio Unit. <SortIcon field="price" /></div>
+                    </th>
                     <th className="px-1 py-4 text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
                   {filteredParts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center">
+                      <td colSpan={5} className="px-6 py-12 text-center">
                         <Package className="w-12 h-12 text-zinc-200 mx-auto mb-3" />
-                        <p className="text-zinc-500 font-medium">No se encontraron repuestos.</p>
+                        <p className="text-zinc-500 font-medium">No se encontraron ítems.</p>
                       </td>
                     </tr>
                   ) : (
@@ -207,7 +283,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart }: Inventor
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
-                              <Package className="w-4 h-4 text-zinc-500" />
+                              {part.name.toUpperCase().includes('M.O.') ? <Wrench className="w-4 h-4 text-blue-500" /> : <Package className="w-4 h-4 text-zinc-500" />}
                             </div>
                             <span className="font-semibold text-zinc-900">{part.name}</span>
                           </div>
@@ -226,22 +302,22 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart }: Inventor
                         <td className="px-6 py-4 text-right font-bold text-zinc-700">
                           ${part.price.toLocaleString('es-CL')}
                         </td>
-                        <td className="px-6 py-4 text-center md:text-left">
-                          {part.assigned_to ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              {part.assigned_to}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-zinc-400 italic">Libre</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={() => handleEdit(part)}
-                            className="text-emerald-600 hover:text-emerald-700 font-bold text-xs bg-emerald-50 px-3 py-1.5 rounded-lg transition-all active:scale-95"
-                          >
-                            Editar
-                          </button>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => handleEdit(part)}
+                              className="text-emerald-600 hover:text-emerald-700 font-bold text-xs bg-emerald-50 px-3 py-1.5 rounded-lg transition-all active:scale-95"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => handleDelete(part.id)}
+                              className="text-red-300 hover:text-red-600 transition-colors p-1.5"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))

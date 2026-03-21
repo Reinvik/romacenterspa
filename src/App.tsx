@@ -60,7 +60,7 @@ export default function App() {
     // Garage operations
     tickets, mechanics, parts, customers, settings, loading, reminders, notifications,
     addTicket, updateTicketStatus, updateTicket, searchTicket,
-    addPart, updatePart,
+    addPart, updatePart, deletePart,
     addCustomer, updateCustomer, deleteCustomer,
     updateVehicle, deleteVehicle,
     updateSettings,
@@ -274,7 +274,13 @@ export default function App() {
 
 
       {activeTab === 'inventory' && (
-        <Inventory parts={parts} settings={settings} onAddPart={addPart} onUpdatePart={updatePart} />
+        <Inventory 
+          parts={parts} 
+          settings={settings} 
+          onAddPart={addPart} 
+          onUpdatePart={updatePart} 
+          onDeletePart={deletePart} 
+        />
       )}
 
       {activeTab === 'agenda' && (

@@ -25,6 +25,7 @@ export interface ServiceLogEntry {
 export interface ServiceItem {
   descripcion: string;
   costo: number;
+  cantidad?: number; // Quantity, defaults to 1
   part_id?: string; // Optional link to inventory Part
 }
 
