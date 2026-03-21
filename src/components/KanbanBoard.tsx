@@ -228,70 +228,54 @@ export function KanbanBoard({
 
       {/* ── Toolbar: Zoom + Monitor Toggle ───────────────────── */}
       <div className={cn(
-        "flex flex-wrap items-center justify-between gap-3 mb-4 flex-shrink-0 px-1",
-        isMonitorMode && "fixed bottom-6 left-6 z-50 mb-0 px-0 bg-white/90 backdrop-blur-md p-2 rounded-2xl border border-zinc-200 shadow-2xl opacity-40 hover:opacity-100 transition-all duration-300 scale-90"
+        "flex flex-wrap items-center justify-between gap-2 mb-2 flex-shrink-0 px-1",
+        isMonitorMode && "fixed bottom-6 left-6 z-50 mb-0 px-0 bg-white/90 backdrop-blur-md p-2 rounded-2xl border border-zinc-200 shadow-2xl opacity-40 hover:opacity-100 transition-all duration-300 scale-90",
+        !isMonitorMode && "sm:flex hidden" // Hide vertical zoom/monitor controls on mobile header to save space
       )}>
         <div className="flex items-center gap-3 flex-wrap">
           {/* Zoom controls */}
-          <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-xl border border-zinc-200">
+          <div className="flex items-center gap-1 bg-zinc-100 p-0.5 rounded-lg border border-zinc-200">
             <button
               onClick={() => setZoomLevel(prev => Math.max(0.4, +(prev - 0.1).toFixed(1)))}
-              className="p-1.5 hover:bg-white rounded-lg transition-colors text-zinc-600 text-sm font-bold leading-none"
-              title="Alejar"
+              className="px-1.5 py-0.5 hover:bg-white rounded transition-colors text-zinc-600 text-xs font-bold"
             >−</button>
-            <span className="text-[10px] font-black font-mono w-10 text-center text-zinc-500 select-none">
+            <span className="text-[9px] font-black font-mono w-8 text-center text-zinc-500 select-none">
               {Math.round(zoomLevel * 100)}%
             </span>
             <button
               onClick={() => setZoomLevel(prev => Math.min(1, +(prev + 0.1).toFixed(1)))}
-              className="p-1.5 hover:bg-white rounded-lg transition-colors text-zinc-600 text-sm font-bold leading-none"
-              title="Acercar"
+              className="px-1.5 py-0.5 hover:bg-white rounded transition-colors text-zinc-600 text-xs font-bold"
             >+</button>
           </div>
 
-          {/* Monitor Mode toggle */}
           <button
             onClick={() => setIsMonitorMode?.(!isMonitorMode)}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shadow-sm whitespace-nowrap",
-              isMonitorMode
-                ? "bg-amber-500 text-white border-amber-600 hover:bg-amber-600"
-                : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
-            )}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold transition-all border shadow-sm bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
           >
-            {isMonitorMode ? (
-              <><X className="w-3.5 h-3.5" />Salir Monitor</>
-            ) : (
-              <><BarChart3 className="w-3.5 h-3.5" />Modo Monitor</>
-            )}
+            <BarChart3 className="w-3 h-3" />
+            {isMonitorMode ? 'Salir Monitor' : 'Monitor'}
           </button>
         </div>
-
-        {isMonitorMode && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20">
-            <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-            Auto 10s
-          </div>
-        )}
       </div>
 
-      {/* ── Boards area (zoomable) ───────────────────────────── */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-x-auto relative scrollbar-hide snap-x snap-mandatory lg:snap-none">
         <div
-          className="absolute inset-0 transition-transform duration-300 ease-out origin-top-left"
-          style={{
+          className={cn(
+            "h-full min-w-max transition-transform duration-300 ease-out origin-top-left",
+            zoomLevel !== 1 ? "absolute inset-0" : "flex flex-col relative"
+          )}
+          style={zoomLevel !== 1 ? {
             transform: `scale(${zoomLevel})`,
             width: `${(1 / zoomLevel) * 100}%`,
             height: `${(1 / zoomLevel) * 100}%`,
-          }}
+          } : undefined}
         >
-          {/* Mechanic filters */}
           {mechanics.length > 0 && (
-            <div className="flex justify-center gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide flex-shrink-0 w-full">
+            <div className="flex justify-start sm:justify-center gap-2 overflow-x-auto pb-2 mb-2 scrollbar-hide flex-shrink-0 w-full px-2">
               <button
                 onClick={() => setSelectedMechanic(null)}
                 className={cn(
-                  "px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 border",
+                  "px-3 py-1 rounded-full text-[10px] font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border",
                   selectedMechanic === null
                     ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
                     : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"
@@ -304,14 +288,14 @@ export function KanbanBoard({
                   key={m.id}
                   onClick={() => setSelectedMechanic(selectedMechanic === m.name ? null : m.name)}
                   className={cn(
-                    "px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 border",
+                    "px-3 py-1 rounded-full text-[10px] font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border",
                     selectedMechanic === m.name
                       ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
                       : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"
                   )}
                 >
                   <div className={cn(
-                    "w-4 h-4 rounded-full flex items-center justify-center text-[8px]",
+                    "w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px]",
                     selectedMechanic === m.name ? "bg-zinc-800 text-zinc-300" : "bg-zinc-100 text-zinc-500"
                   )}>
                     {m.name.charAt(0).toUpperCase()}
@@ -323,9 +307,9 @@ export function KanbanBoard({
           )}
 
           {/* Columns row */}
-          <div className="flex gap-3 overflow-x-auto pb-4 h-full">
+          <div className="flex gap-2 lg:gap-3 px-2 lg:px-0 h-full pb-2">
             {/* Agenda column */}
-            <div className="flex-1 min-w-[200px] bg-amber-50/50 rounded-2xl p-3 flex flex-col border border-amber-200/40">
+            <div className="flex-1 min-w-[240px] max-w-[280px] sm:min-w-[200px] bg-amber-50/50 rounded-xl p-2 sm:p-3 flex flex-col border border-amber-200/40 snap-center lg:snap-align-none">
               <div className="flex items-center justify-between mb-3 px-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-amber-100 text-amber-800">
@@ -389,7 +373,7 @@ export function KanbanBoard({
               return (
                 <div
                   key={column.id}
-                  className="flex-1 min-w-[180px] bg-zinc-100 rounded-2xl p-3 flex flex-col border border-zinc-200/60"
+                  className="flex-1 min-w-[240px] max-w-[280px] sm:min-w-[180px] bg-zinc-100 rounded-xl p-2 sm:p-3 flex flex-col border border-zinc-200/60 snap-center lg:snap-align-none"
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, column.id)}
                 >

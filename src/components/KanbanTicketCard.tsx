@@ -66,7 +66,7 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
       draggable={ticket.status !== 'Finalizado'}
       onDragStart={(e) => onDragStart(e, ticket.id)}
       className={cn(
-        "bg-white p-3 rounded-2xl shadow-sm border border-zinc-200 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group flex flex-col gap-2.5",
+        "bg-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl shadow-sm border border-zinc-200 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group flex flex-col gap-2",
         isDragged && "opacity-50 ring-2 ring-emerald-500",
         isAttenuated && !isDragged && "opacity-40 grayscale-[0.8] hover:opacity-100 hover:grayscale-0"
       )}
@@ -79,20 +79,19 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
               e.stopPropagation();
               onShowCRM?.(ticket);
             }}
-            className="group/plate flex items-center bg-white border-[3px] border-zinc-900 rounded-lg shadow-sm mb-2 w-max hover:bg-zinc-50 transition-all active:scale-95 overflow-hidden ring-1 ring-zinc-200"
+            className="group/plate flex items-center bg-white border-[2px] border-zinc-900 rounded-md shadow-sm mb-1.5 w-max hover:bg-zinc-50 transition-all active:scale-95 overflow-hidden ring-1 ring-zinc-200"
             title="Ver historial completo del vehículo"
           >
-            <div className="w-2 h-full bg-blue-600 self-stretch flex items-center justify-center py-1">
+            <div className="w-1.5 h-full bg-blue-600 self-stretch flex items-center justify-center py-0.5">
               <div className="w-0.5 h-0.5 bg-white rounded-full"></div>
             </div>
-            <div className="px-2 py-0.5 flex items-center gap-2">
-              <span className="text-xs font-mono font-black text-zinc-900 tracking-widest uppercase">
+            <div className="px-1.5 py-0 flex items-center gap-1.5">
+              <span className="text-[10px] sm:text-xs font-mono font-black text-zinc-900 tracking-wider uppercase">
                 {ticket.id}
               </span>
-              <History className="w-3 h-3 text-zinc-400 group-hover/plate:text-zinc-900 transition-colors" />
             </div>
           </button>
-          <h3 className="font-bold text-zinc-900 leading-tight text-xs truncate" title={ticket.model}>
+          <h3 className="font-bold text-zinc-900 leading-tight text-[11px] sm:text-xs truncate" title={ticket.model}>
             {ticket.model}
           </h3>
         </div>

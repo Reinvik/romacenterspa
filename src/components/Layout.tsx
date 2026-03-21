@@ -178,7 +178,7 @@ export function Layout({
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Header */}
         {!isMonitorMode && (
-        <header className="h-16 bg-white border-b border-zinc-200 flex items-center justify-between px-4 lg:px-8 shrink-0">
+        <header className="h-14 lg:h-16 bg-white border-b border-zinc-200 flex items-center justify-between px-2 lg:px-8 shrink-0">
           <div className="flex items-center gap-3 flex-1">
             <button
               onClick={() => setIsSidebarOpen(true)}
@@ -187,28 +187,28 @@ export function Layout({
               <Menu className="w-6 h-6" />
             </button>
             {activeTab !== 'dashboard' ? (
-              <h1 className="text-lg lg:text-xl font-bold tracking-tight text-zinc-800 truncate max-w-[150px] md:max-w-none">
+              <h1 className="text-base lg:text-xl font-bold tracking-tight text-zinc-800 truncate max-w-[150px] md:max-w-none ml-1">
                 {navItems.find(i => i.id === activeTab)?.label || 'Configuración'}
               </h1>
             ) : (
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-4 flex-1 w-full">
-                <h1 className="text-lg lg:text-xl font-bold tracking-tight text-zinc-900 whitespace-nowrap">Flujo de Trabajo</h1>
-                <div className="relative flex-1 max-w-md w-full">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+              <div className="flex flex-row items-center gap-2 flex-1 w-full overflow-hidden">
+                <h1 className="text-lg lg:text-xl font-bold tracking-tight text-zinc-900 whitespace-nowrap hidden sm:block">Flujo de Trabajo</h1>
+                <div className="relative flex-1 max-w-md w-full min-w-0">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
                   <input
                     type="text"
-                    placeholder="Buscar cliente, patente o cita..."
-                    className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                    placeholder="Buscar..."
+                    className="w-full pl-7 pr-3 py-1.5 text-xs rounded-lg border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all placeholder:text-zinc-400"
                     value={searchTerm}
                     onChange={e => setSearchTerm?.(e.target.value)}
                   />
                 </div>
 
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
+                <div className="relative flex-shrink-0">
+                  <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none" />
                   <input
                     type="date"
-                    className="pl-9 pr-4 py-2 text-sm rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all bg-white text-zinc-900 font-bold"
+                    className="pl-7 pr-3 py-1.5 text-[10px] sm:text-xs rounded-lg border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all bg-white text-zinc-900 font-bold"
                     value={viewDate}
                     onChange={e => setViewDate?.(e.target.value)}
                   />
@@ -247,7 +247,7 @@ export function Layout({
             {activeTab === 'dashboard' && (
               <button
                 onClick={onAddTicket}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors shadow-sm whitespace-nowrap"
+                className="flex items-center justify-center w-9 h-9 sm:w-auto sm:px-4 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg sm:rounded-xl font-medium transition-colors shadow-sm shrink-0"
               >
                 <Plus className="w-5 h-5" />
                 <span className="hidden sm:inline">Nuevo Ingreso</span>
