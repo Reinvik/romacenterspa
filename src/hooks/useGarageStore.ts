@@ -23,21 +23,47 @@ export function useGarageStore(companyId?: string) {
     try {
       if (!isSilent) setLoading(true);
 
+      const fetchAll = async (table: string, orderCol: string = 'created_at', ascending: boolean = false) => {
+        let allData: any[] = [];
+        let from = 0;
+        let hasMore = true;
+        const limit = 1000;
+
+        while (hasMore) {
+          const { data, error } = await supabaseGarage
+            .from(table)
+            .select('*')
+            .eq('company_id', companyId)
+            .order(orderCol, { ascending })
+            .range(from, from + limit - 1);
+
+          if (error) throw error;
+          if (data && data.length > 0) {
+            allData = [...allData, ...data];
+            from += limit;
+            if (data.length < limit) hasMore = false;
+          } else {
+            hasMore = false;
+          }
+        }
+        return allData;
+      };
+
       const [
-        { data: ticketsData },
-        { data: mechanicsData },
-        { data: partsData },
-        { data: customersData },
+        ticketsData,
+        mechanicsData,
+        partsData,
+        customersData,
         { data: settingsData },
-        { data: remindersData },
+        remindersData,
         { data: notificationsData }
       ] = await Promise.all([
-        supabaseGarage.from('garage_tickets').select('*').eq('company_id', companyId).order('entry_date', { ascending: false }).limit(5000),
-        supabaseGarage.from('garage_mechanics').select('*').eq('company_id', companyId).order('name', { ascending: true }),
-        supabaseGarage.from('garage_parts').select('*').eq('company_id', companyId).order('name', { ascending: true }),
-        supabaseGarage.from('garage_customers').select('*').eq('company_id', companyId).order('name', { ascending: true }).limit(5000),
+        fetchAll('garage_tickets', 'entry_date', false),
+        supabaseGarage.from('garage_mechanics').select('*').eq('company_id', companyId).order('name', { ascending: true }).then(r => r.data),
+        fetchAll('garage_parts', 'name', true),
+        fetchAll('garage_customers', 'name', true),
         supabaseGarage.from('garage_settings').select('*').eq('company_id', companyId).maybeSingle(),
-        supabaseGarage.from('garage_reminders').select('*').eq('company_id', companyId).order('planned_date', { ascending: true }),
+        supabaseGarage.from('garage_reminders').select('*').eq('company_id', companyId).order('planned_date', { ascending: true }).then(r => r.data),
         supabaseGarage.from('garage_notifications').select('*').eq('company_id', companyId).order('created_at', { ascending: false }).limit(20)
       ]);
 
@@ -48,7 +74,7 @@ export function useGarageStore(companyId?: string) {
         
         // Fallback: If not found by ID, try matching by name (case-insensitive)
         if (!mechanic && t.mechanic) {
-            mechanic = (mechanicsData || []).find(m => m.name.toUpperCase() === t.mechanic.toUpperCase());
+            mechanic = (mechanicsData || []).find(m => (m.name || '').toUpperCase() === (t.mechanic || '').toUpperCase());
         }
 
         return {
