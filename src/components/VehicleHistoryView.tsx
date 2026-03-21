@@ -66,9 +66,37 @@ export function VehicleHistoryView({ ticket, settings }: VehicleHistoryViewProps
                   <Wrench className="w-3.5 h-3.5" />
                 </div>
                 <div className="flex-1 bg-white border border-zinc-100 rounded-xl p-3 shadow-sm">
-                  <div className="font-bold text-[11px] text-zinc-900">Servicio Actual</div>
-                  <div className="text-[9px] text-zinc-400 mb-2">Ingresado {format(parseISO(ticket.entry_date), "d MMM, yyyy", { locale: es })}</div>
-                  <p className="text-[11px] text-zinc-600 line-clamp-2 italic">{ticket.notes || 'Sin notas'}</p>
+                  <div className="flex justify-between items-start mb-1">
+                    <div className="font-bold text-[11px] text-zinc-900">Servicio Actual</div>
+                    {ticket.mileage && (
+                      <div className="text-[10px] font-black text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">
+                        {ticket.mileage.toLocaleString()} KM
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-[9px] text-zinc-400 mb-3">Ingresado {format(parseISO(ticket.entry_date), "d MMM, yyyy", { locale: es })}</div>
+                  
+                  {/* Detalle de Servicios Actuales */}
+                  {(ticket.services && ticket.services.length > 0) || (ticket.spare_parts && ticket.spare_parts.length > 0) ? (
+                    <div className="space-y-2 mb-3">
+                      {ticket.services?.map((s, i) => (
+                        <div key={i} className="flex justify-between items-center text-[10px] bg-zinc-50 p-1.5 rounded border border-zinc-100/50">
+                          <span className="font-bold text-zinc-700 uppercase tracking-tighter line-clamp-1">{s.descripcion}</span>
+                          <span className="text-zinc-400 font-mono">${s.costo.toLocaleString()}</span>
+                        </div>
+                      ))}
+                      {ticket.spare_parts?.map((p, i) => (
+                        <div key={i} className="flex justify-between items-center text-[10px] bg-blue-50/50 p-1.5 rounded border border-blue-100/30">
+                          <span className="font-medium text-blue-700 italic line-clamp-1">Repuesto: {p.descripcion}</span>
+                          <span className="text-blue-300 font-mono">${p.costo.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <p className="text-[11px] text-zinc-600 line-clamp-3 italic bg-zinc-50/30 p-2 rounded-lg border border-dashed border-zinc-100">
+                    {ticket.notes || 'Sin notas adicionales'}
+                  </p>
                 </div>
               </div>
             )}
@@ -82,7 +110,7 @@ export function VehicleHistoryView({ ticket, settings }: VehicleHistoryViewProps
                 <div className="flex-1 bg-white border border-zinc-100 rounded-xl p-3 shadow-sm hover:border-zinc-200 transition-colors">
                   <div className="flex items-center justify-between mb-1">
                     <div className="font-bold text-[11px] text-zinc-800">Finalizado</div>
-                    <div className="text-[10px] font-black text-zinc-900">
+                    <div className="text-[10px] font-black text-zinc-900 bg-zinc-50 px-2 py-0.5 rounded-full border border-zinc-100">
                       ${visit.cost?.toLocaleString('es-CL') || 0}
                     </div>
                   </div>
@@ -90,7 +118,21 @@ export function VehicleHistoryView({ ticket, settings }: VehicleHistoryViewProps
                     {format(parseISO(visit.date), "d MMM, yyyy", { locale: es })} 
                     {visit.mileage ? ` • ${visit.mileage.toLocaleString()} km` : ''}
                   </div>
-                  <p className="text-[11px] text-zinc-500 line-clamp-2 italic">{visit.notes || 'Sin notas'}</p>
+
+                  {/* Detalle de Repuestos/Servicios si están en el log */}
+                  {visit.parts && visit.parts.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {visit.parts.map((p, i) => (
+                        <span key={i} className="text-[8px] font-bold px-1.5 py-0.5 bg-zinc-50 text-zinc-500 rounded border border-zinc-100 uppercase">
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-[11px] text-zinc-500 line-clamp-3 italic bg-zinc-50/30 p-2 rounded-lg border border-dashed border-zinc-100">
+                    {visit.notes || 'Sin notas'}
+                  </p>
                 </div>
               </div>
             ))}

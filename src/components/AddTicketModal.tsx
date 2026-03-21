@@ -83,7 +83,7 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
 
       // De-duplicar resultados (priorizar clientes sobre tickets si coinciden datos clave)
       const uniqueResults = Array.from(new Map(combinedResults.map(item => {
-          const key = 'phone' in item ? item.phone : item.owner_phone;
+          const key = 'vehicles' in item ? item.vehicles?.[0] : (item as Ticket).id;
           return [key, item];
       })).values());
 

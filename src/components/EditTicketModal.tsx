@@ -190,7 +190,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                 </span>
                             </button>
                             <h2 className="text-2xl font-black tracking-tight text-zinc-900 leading-tight">
-                                Editar {ticket.model}
+                                Editar {ticket.model} {ticket.owner_name ? ` - ${ticket.owner_name}` : ''}
                             </h2>
                         </div>
                         <button onClick={onClose} className="p-2 text-zinc-300 hover:text-zinc-600 rounded-full hover:bg-zinc-100 transition-colors">

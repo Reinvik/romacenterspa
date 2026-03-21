@@ -65,10 +65,12 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
     <div
       draggable={ticket.status !== 'Finalizado'}
       onDragStart={(e) => onDragStart(e, ticket.id)}
+      onClick={() => onEdit(ticket)}
       className={cn(
         "bg-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl shadow-sm border border-zinc-200 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group flex flex-col gap-2",
         isDragged && "opacity-50 ring-2 ring-emerald-500",
-        isAttenuated && !isDragged && "opacity-40 grayscale-[0.8] hover:opacity-100 hover:grayscale-0"
+        isAttenuated && !isDragged && "opacity-40 grayscale-[0.8] hover:opacity-100 hover:grayscale-0",
+        ticket.status === 'Finalizado' && "cursor-pointer" // Permite clic aunque no sea draggeable
       )}
     >
       <div className="flex justify-between items-start">
@@ -97,21 +99,38 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
         </div>
         
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          {ticket.status !== 'Finalizado' && (
-            <button
-              onClick={() => onEdit(ticket)}
-              className="text-zinc-400 hover:text-emerald-600 p-1 hover:bg-zinc-100 rounded-lg transition-colors"
-              title="Editar Ticket"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(ticket);
+            }}
+            className="text-zinc-400 hover:text-emerald-600 p-1 hover:bg-zinc-100 rounded-lg transition-colors"
+            title="Ver/Editar Ticket"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
       <p className="text-[11px] text-zinc-600 line-clamp-2 leading-relaxed bg-zinc-50 p-2 rounded-lg border border-zinc-100">
         {ticket.notes || <span className="italic text-zinc-400">Sin observaciones...</span>}
       </p>
+
+      {/* Resumen de Servicios Realizados */}
+      {ticket.services && ticket.services.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-0.5">
+          {ticket.services.map((s, idx) => (
+            <div key={idx} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded text-[9px] font-black uppercase tracking-tighter">
+              {s.descripcion}
+            </div>
+          ))}
+          {ticket.spare_parts && ticket.spare_parts.length > 0 && (
+            <div className="px-1.5 py-0.5 bg-amber-50 text-amber-600 border border-amber-100 rounded text-[9px] font-black uppercase tracking-tighter">
+              +{ticket.spare_parts.length} REPUESTO{ticket.spare_parts.length !== 1 ? 'S' : ''}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-between mt-auto">
         <div className="flex flex-col gap-1.5">

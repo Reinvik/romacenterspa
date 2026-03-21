@@ -106,21 +106,7 @@ export function useGarageStore(companyId?: string) {
 
   useEffect(() => {
     fetchData();
-
-    // Suscribirse a cambios en tiempo real
-    const channels = [
-      supabase.channel('garage_tickets_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_tickets' }, () => fetchData(true)).subscribe(),
-      supabase.channel('garage_mechanics_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_mechanics' }, () => fetchData(true)).subscribe(),
-      supabase.channel('garage_parts_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_parts' }, () => fetchData(true)).subscribe(),
-      supabase.channel('garage_customers_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_customers' }, () => fetchData(true)).subscribe(),
-      supabase.channel('garage_settings_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_settings' }, () => fetchData(true)).subscribe(),
-      supabase.channel('garage_reminders_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_reminders' }, () => fetchData(true)).subscribe(),
-      supabase.channel('garage_notifications_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'garage_notifications' }, () => fetchData(true)).subscribe(),
-    ];
-
-    return () => {
-      channels.forEach(channel => supabase.removeChannel(channel));
-    };
+    // Realtime disabled by user request for stability
   }, [fetchData]);
 
   const addTicket = async (ticket: Partial<Ticket>) => {
@@ -198,7 +184,31 @@ export function useGarageStore(companyId?: string) {
 
       if (existingTicket) {
         // Vehículo reingresado
-        // Si no está "Entregado", igual forzamos el reingreso
+        // 1. Archivar la sesión actual en el historial (si tiene contenido relevante)
+        const currentLog = existingTicket.service_log || [];
+        const hasWorkDone = (existingTicket.services && existingTicket.services.length > 0) || existingTicket.notes;
+        
+        let newLog = currentLog;
+        if (hasWorkDone) {
+          const newEntry = {
+            date: existingTicket.close_date || existingTicket.last_status_change || new Date().toISOString(),
+            notes: existingTicket.notes || '',
+            parts: [
+              ...(existingTicket.services || []).map(s => s.descripcion),
+              ...(existingTicket.spare_parts || []).map(p => `Repuesto: ${p.descripcion}`)
+            ],
+            cost: existingTicket.cost || existingTicket.quotation_total || 0,
+            mileage: existingTicket.mileage,
+            job_photos: existingTicket.job_photos || []
+          };
+          // Evitar duplicados si el último log es idéntico en fecha y notas (opcional, pero ayuda)
+          const lastLog = currentLog[currentLog.length - 1];
+          if (!lastLog || lastLog.date !== newEntry.date || lastLog.notes !== newEntry.notes) {
+            newLog = [...currentLog, newEntry];
+          }
+        }
+
+        // 2. Actualizar con datos del nuevo ingreso
         const { error } = await supabaseGarage.from('garage_tickets')
           .update({
              status: ticket.status || 'Ingresado',
@@ -214,7 +224,11 @@ export function useGarageStore(companyId?: string) {
              quotation_accepted: false,
              vin: ticket.vin || existingTicket.vin,
              engine_id: ticket.engine_id || existingTicket.engine_id,
-             mileage: ticket.mileage || existingTicket.mileage
+             mileage: ticket.mileage || existingTicket.mileage,
+             services: ticket.services || [],
+             spare_parts: [], // Resetear repuestos para nueva visita
+             job_photos: [],  // Resetear fotos para nueva visita
+             service_log: newLog
           })
           .eq('id', ticket.id);
 
