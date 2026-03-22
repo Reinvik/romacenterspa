@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Ticket, TicketStatus, Mechanic, Part, Customer, GarageSettings, Reminder, GarageNotification } from '../types';
+import { Ticket, TicketStatus, Mechanic, Part, Customer, GarageSettings, Reminder, GarageNotification, SalaVenta, SalaVentaItem } from '../types';
 import { supabase, supabaseGarage } from '../lib/supabase';
 
 export const TIME_SLOTS = [
@@ -17,6 +17,7 @@ export function useGarageStore(companyId?: string) {
   const [notifications, setNotifications] = useState<GarageNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<GarageSettings | null>(null);
+  const [salaVentas, setSalaVentas] = useState<SalaVenta[]>([]);
 
   const fetchData = useCallback(async (isSilent = false) => {
     if (!companyId) return;
@@ -228,7 +229,8 @@ export function useGarageStore(companyId?: string) {
              services: ticket.services || [],
              spare_parts: ticket.spare_parts || [], // Guardar repuestos del nuevo ingreso
              job_photos: [],  // Resetear fotos para nueva visita
-             service_log: newLog
+             service_log: newLog,
+             cost: ticket.cost || 0
           })
           .eq('id', ticket.id);
 
@@ -251,7 +253,8 @@ export function useGarageStore(companyId?: string) {
           engine_id: ticket.engine_id,
           mileage: ticket.mileage,
           services: ticket.services || [],
-          spare_parts: ticket.spare_parts || []
+          spare_parts: ticket.spare_parts || [],
+          cost: ticket.cost || 0
         }]);
 
         if (error) throw error;
@@ -516,6 +519,7 @@ export function useGarageStore(companyId?: string) {
       if (updates.job_photos !== undefined) dbUpdates.job_photos = updates.job_photos;
       if (updates.services !== undefined) dbUpdates.services = updates.services;
       if (updates.spare_parts !== undefined) dbUpdates.spare_parts = updates.spare_parts;
+      if (updates.cost !== undefined) dbUpdates.cost = updates.cost;
 
       if (updates.mechanic_id !== undefined) {
         dbUpdates.mechanic = updates.mechanic_id === 'Sin asignar' ? null : updates.mechanic_id;
@@ -1009,6 +1013,60 @@ export function useGarageStore(companyId?: string) {
     }
   }, [fetchData]);
 
+  const fetchSalaVentas = useCallback(async (days: number = 30) => {
+    if (!companyId) return [];
+    try {
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+      const { data, error } = await supabaseGarage
+        .from('garage_sala_ventas')
+        .select('*')
+        .eq('company_id', companyId)
+        .gte('sold_at', since.toISOString())
+        .order('sold_at', { ascending: false });
+      if (error) throw error;
+      const result = (data || []) as SalaVenta[];
+      setSalaVentas(result);
+      return result;
+    } catch (error) {
+      console.error('Error fetching sala ventas:', error);
+      return [];
+    }
+  }, [companyId]);
+
+  const addSalaVenta = useCallback(async (items: SalaVentaItem[], notes?: string) => {
+    if (!companyId) return;
+    const total = items.reduce((acc, i) => acc + i.subtotal, 0);
+    try {
+      // 1. Insert the sale
+      const { error } = await supabaseGarage.from('garage_sala_ventas').insert([{
+        company_id: companyId,
+        items,
+        total,
+        notes: notes || null,
+        sold_at: new Date().toISOString()
+      }]);
+      if (error) throw error;
+
+      // 2. Deduct stock for each item
+      for (const item of items) {
+        const part = parts.find(p => p.id === item.part_id);
+        if (part) {
+          const newStock = Math.max(0, part.stock - item.cantidad);
+          await supabaseGarage.from('garage_parts')
+            .update({ stock: newStock })
+            .eq('id', item.part_id);
+        }
+      }
+
+      // 3. Refresh data
+      await Promise.all([fetchSalaVentas(), fetchData(true)]);
+    } catch (error) {
+      console.error('Error adding sala venta:', error);
+      throw error;
+    }
+  }, [companyId, parts, fetchSalaVentas, fetchData]);
+
   return {
     tickets,
     mechanics,
@@ -1018,6 +1076,7 @@ export function useGarageStore(companyId?: string) {
     reminders,
     notifications,
     loading,
+    salaVentas,
     addTicket,
     updateTicketStatus,
     addMechanic,
@@ -1049,6 +1108,8 @@ export function useGarageStore(companyId?: string) {
     fetchActiveReminder,
     fetchPublicSettingsBySlug,
     fetchOccupiedReminders,
-    fetchPublicVehicleInfo
+    fetchPublicVehicleInfo,
+    fetchSalaVentas,
+    addSalaVenta
   };
 }

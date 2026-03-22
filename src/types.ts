@@ -127,3 +127,23 @@ export interface GarageSettings {
   theme_menu_highlight?: string;
   company_slug?: string;
 }
+
+// ─── Sala Ventas (Mostrador / POS) ───────────────────────────────────────────
+
+export interface SalaVentaItem {
+  part_id: string;
+  nombre: string;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+}
+
+export interface SalaVenta {
+  id: string;
+  company_id: string;
+  items: SalaVentaItem[];
+  total: number;
+  notes?: string;
+  sold_at: string; // ISO string
+  created_at: string; // ISO string
+}

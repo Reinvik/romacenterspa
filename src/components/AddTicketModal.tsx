@@ -226,6 +226,7 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     const ticketToSubmit = {
       ...formData,
       total_estimated_cost: totalEstimatedCost,
+      cost: totalEstimatedCost,
       spare_parts: formData.spare_parts // Asegurar que pasamos spare_parts
     };
 

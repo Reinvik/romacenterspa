@@ -145,6 +145,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                 notes,
                 mechanic_id: mechanicId === 'Sin asignar' ? null : mechanicId,
                 quotation_total: totalInvestment,
+                cost: totalInvestment,
                 mileage,
                 job_photos: jobPhotos,
                 services: [],

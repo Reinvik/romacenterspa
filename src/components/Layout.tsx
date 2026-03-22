@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Wrench, Package, Users, Settings, LogOut, Bell, Calendar, Menu, X, BarChart3, Search, CalendarCheck, Plus, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Wrench, Package, Users, Settings, LogOut, Bell, Calendar, Menu, X, BarChart3, Search, CalendarCheck, Plus, RefreshCw, ShoppingCart } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -52,6 +52,8 @@ export function Layout({
 
   const navItems = [
     { id: 'dashboard', label: 'Tablero Kanban', icon: LayoutDashboard },
+    { id: 'sales', label: 'Inf. ventas', icon: BarChart3 },
+    { id: 'sala_ventas', label: 'Sala Ventas', icon: ShoppingCart },
     { id: 'inventory', label: 'Repuestos', icon: Package },
     { id: 'customers', label: 'Clientes', icon: Users },
     { id: 'mechanics', label: 'Mecánicos', icon: Wrench },

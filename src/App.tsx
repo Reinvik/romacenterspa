@@ -19,6 +19,8 @@ import { SettingsForm } from './components/SettingsForm';
 import { Agenda } from './components/Agenda';
 import { PublicBookingModal } from './components/PublicBookingModal';
 import { LandingPage } from './components/LandingPage';
+import { Sales } from './components/Sales';
+import { SalaVentas } from './components/SalaVentas';
 
 type ViewState = 'landing' | 'login' | 'customer' | 'dashboard';
 
@@ -69,7 +71,8 @@ export default function App() {
     clearFinishedTickets, deleteTicket,
     searchTicketsHistory,
     fetchCompanies, addIntelligentReminder, fetchActiveReminder, fetchPublicSettingsBySlug, fetchOccupiedReminders, fetchPublicVehicleInfo,
-    addReminder, deleteReminder, updateReminder, refreshData, uploadTicketPhoto
+    addReminder, deleteReminder, updateReminder, refreshData, uploadTicketPhoto,
+    salaVentas, addSalaVenta, fetchSalaVentas
   } = useGarageStore(profile?.company_id);
 
   // Monitor Mode Auto-refresh
@@ -273,6 +276,24 @@ export default function App() {
         />
       )}
 
+      {activeTab === 'sales' && (
+        <Sales 
+          tickets={tickets} 
+          parts={parts} 
+          settings={settings}
+          salaVentas={salaVentas}
+        />
+      )}
+
+      {activeTab === 'sala_ventas' && (
+        <SalaVentas
+          parts={parts}
+          onAddSalaVenta={addSalaVenta}
+          fetchSalaVentas={fetchSalaVentas}
+          salaVentas={salaVentas}
+          settings={settings}
+        />
+      )}
 
       {activeTab === 'inventory' && (
         <Inventory 
