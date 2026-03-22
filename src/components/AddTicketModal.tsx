@@ -31,12 +31,40 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     spare_parts: [] as ServiceItem[],
   });
 
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
   const [partSearch, setPartSearch] = useState('');
   const [showPartDropdown, setShowPartDropdown] = useState(false);
-
   const [brandSearch, setBrandSearch] = useState('');
   const [modelSuggestions, setModelSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Reset form when opening
+  useEffect(() => {
+    if (isOpen) {
+      setIsResetting(true);
+      setFormData({
+        id: '',
+        model: '',
+        status: 'Ingresado',
+        mechanic_id: 'Sin asignar',
+        owner_name: '',
+        owner_phone: '',
+        notes: '',
+        mileage: 0,
+        entry_date: format(new Date(), 'yyyy-MM-dd'),
+        spare_parts: [],
+      });
+      setCustomerSearch('');
+      setIsCustomerFilled(false);
+      setPartSearch('');
+      setBrandSearch('');
+      setShowPartDropdown(false);
+      setShowSuggestions(false);
+      // Small timeout to prevent interference with other effects
+      setTimeout(() => setIsResetting(false), 50);
+    }
+  }, [isOpen]);
 
   const systemModels = useMemo(() => {
     const models = new Set<string>();
@@ -56,6 +84,7 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
   const [isCustomerFilled, setIsCustomerFilled] = useState(false);
 
   useEffect(() => {
+    if (isResetting) return;
     if (customerSearch.length >= 2 && !isCustomerFilled) {
       const searchLower = customerSearch.toLowerCase();
       
@@ -498,11 +527,10 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
                       <button
                         key={part.id}
                         type="button"
-                        disabled={isOutOfStock}
                         onClick={() => handleSelectInventoryPart(part)}
                         className={cn(
                           "w-full flex items-center justify-between px-4 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-zinc-50 last:border-0",
-                          isOutOfStock && "opacity-40 cursor-not-allowed"
+                          isOutOfStock && "bg-amber-50/30"
                         )}
                       >
                         <div className="flex items-center gap-2">
