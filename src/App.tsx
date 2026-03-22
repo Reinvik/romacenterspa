@@ -257,6 +257,7 @@ export default function App() {
           settings={settings}
           onUpdateStatus={updateTicketStatus}
           onEditTicket={handleEditTicket}
+          onDeleteTicket={deleteTicket}
           onAddTicket={() => setIsAddModalOpen(true)}
           onClearFinished={clearFinishedTickets}
           onUpdateNotes={async (id, notes) => {

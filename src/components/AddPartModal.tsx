@@ -52,7 +52,7 @@ export function AddPartModal({ isOpen, onClose, onAdd }: AddPartModalProps) {
                         <input
                             required
                             type="text"
-                            placeholder="Ej: ACE-001 o M.O. CAMBIO ACEITE"
+                            placeholder="Ej: ACE-001 o Servicio CAMBIO ACEITE"
                             className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all font-mono"
                             value={formData.id}
                             onChange={e => setFormData({ ...formData, id: e.target.value.toUpperCase() })}
@@ -64,12 +64,12 @@ export function AddPartModal({ isOpen, onClose, onAdd }: AddPartModalProps) {
                         <input
                             required
                             type="text"
-                            placeholder="Ej: Filtro de Aire o M.O. Diagnóstico"
+                            placeholder="Ej: Filtro de Aire o Servicio Diagnóstico"
                             className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
                             value={formData.name}
                             onChange={e => setFormData({ ...formData, name: e.target.value })}
                         />
-                        <p className="text-[10px] text-zinc-400 mt-1">Tip: Use "M.O." en el nombre para categorizar como Mano de Obra.</p>
+                        <p className="text-[10px] text-zinc-400 mt-1">Tip: Use "Servicio" en el nombre para categorizar como tal.</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

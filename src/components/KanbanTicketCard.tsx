@@ -2,7 +2,7 @@ import React from 'react';
 import { Ticket, GarageSettings } from '../types';
 import { formatDistanceToNow, parseISO, differenceInDays, formatDistance } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Clock, User, MoreVertical, MessageCircle, AlertCircle, History, Camera } from 'lucide-react';
+import { Clock, User, MoreVertical, MessageCircle, AlertCircle, History, Camera, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface KanbanTicketCardProps {
@@ -13,6 +13,7 @@ interface KanbanTicketCardProps {
   isDragged: boolean;
   onDragStart: (e: React.DragEvent, id: string) => void;
   onEdit: (ticket: Ticket) => void;
+  onDelete?: (ticket: Ticket) => void;
   onShowHistory?: (ticket: Ticket) => void;
   onShowCRM?: (ticket: Ticket) => void;
 }
@@ -21,11 +22,13 @@ const statusMap: Record<string, string> = {
   'Ingresado': 'ingresado',
   'En Espera': 'en espera',
   'En Mantención': 'en proceso',
+  'Elevador 1': 'en proceso',
+  'Elevador 2': 'en proceso',
   'Listo para Entrega': 'listo para entrega',
   'Finalizado': 'entregado'
 };
 
-export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged, onDragStart, onEdit, onShowHistory, onShowCRM }: KanbanTicketCardProps) {
+export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged, onDragStart, onEdit, onDelete, onShowHistory, onShowCRM }: KanbanTicketCardProps) {
   const entryDate = ticket.entry_date ? parseISO(ticket.entry_date) : new Date();
   const isValidDate = !isNaN(entryDate.getTime());
   
@@ -99,6 +102,18 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
         </div>
         
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          {(ticket.status === 'Ingresado' || ticket.status === 'En Espera') && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete?.(ticket);
+              }}
+              className="text-zinc-400 hover:text-red-600 p-1 hover:bg-zinc-100 rounded-lg transition-colors"
+              title="Eliminar Ticket mal creado"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -116,17 +131,17 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
         {ticket.notes || <span className="italic text-zinc-400">Sin observaciones...</span>}
       </p>
 
-      {/* Resumen de Servicios Realizados */}
-      {ticket.services && ticket.services.length > 0 && (
+      {/* Resumen de Servicios/Insumos Realizados */}
+      {((ticket.services && ticket.services.length > 0) || (ticket.spare_parts && ticket.spare_parts.length > 0)) && (
         <div className="flex flex-wrap gap-1 mt-0.5">
-          {ticket.services.map((s, idx) => (
-            <div key={idx} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded text-[9px] font-black uppercase tracking-tighter">
+          {[...(ticket.services || []), ...(ticket.spare_parts || [])].slice(0, 3).map((s, idx) => (
+            <div key={idx} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded text-[9px] font-black uppercase tracking-tighter truncate max-w-[120px]">
               {s.descripcion}
             </div>
           ))}
-          {ticket.spare_parts && ticket.spare_parts.length > 0 && (
-            <div className="px-1.5 py-0.5 bg-amber-50 text-amber-600 border border-amber-100 rounded text-[9px] font-black uppercase tracking-tighter">
-              +{ticket.spare_parts.length} REPUESTO{ticket.spare_parts.length !== 1 ? 'S' : ''}
+          {[...(ticket.services || []), ...(ticket.spare_parts || [])].length > 3 && (
+            <div className="px-1.5 py-0.5 bg-zinc-100 text-zinc-500 border border-zinc-200 rounded text-[9px] font-black uppercase tracking-tighter">
+              +{[...(ticket.services || []), ...(ticket.spare_parts || [])].length - 3} MÁS
             </div>
           )}
         </div>

@@ -22,7 +22,6 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     const [quotationTotal, setQuotationTotal] = useState<number>(0);
     const [mileage, setMileage] = useState<number>(0);
     const [jobPhotos, setJobPhotos] = useState<string[]>([]);
-    const [services, setServices] = useState<ServiceItem[]>([]);
     const [spareParts, setSpareParts] = useState<ServiceItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -45,8 +44,12 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
             setJobPhotos(ticket.job_photos || []);
             const savedParts = ticket.spare_parts || [];
             const savedServices = ticket.services || [];
-            setSpareParts(savedParts);
-            setServices(savedServices.length > 0 ? savedServices : [{ descripcion: '', costo: 0, cantidad: 1 }]);
+            // Fusionar servicios anteriores con repuestos en una sola lista
+            const combined = [
+                ...savedServices.filter(s => s.descripcion || s.costo),
+                ...savedParts
+            ];
+            setSpareParts(combined.length > 0 ? combined : []);
             originalPartIds.current = [
                 ...savedParts.filter(p => p.part_id).map(p => p.part_id!),
                 ...savedServices.filter(s => s.part_id).map(s => s.part_id!)
@@ -68,20 +71,6 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     if (!isOpen || !ticket) return null;
 
     const isFinalized = ticket?.status === 'Finalizado' || ticket?.status === 'Entregado';
-
-    // Services
-    const handleAddService = () => setServices([...services, { descripcion: '', costo: 0, cantidad: 1 }]);
-    const handleRemoveService = (index: number) => setServices(services.filter((_, i) => i !== index));
-    const handleServiceChange = (index: number, field: keyof ServiceItem, value: string | number) => {
-        const updated = [...services];
-        if (field === 'costo' || field === 'cantidad') {
-            const numVal = Number(value);
-            updated[index][field] = isNaN(numVal) ? 0 : numVal;
-        } else if (field === 'descripcion') {
-            updated[index].descripcion = value as string;
-        }
-        setServices(updated);
-    };
 
     // Spare parts (manual)
     const handleAddSparePart = () => setSpareParts([...spareParts, { descripcion: '', costo: 0, cantidad: 1 }]);
@@ -109,7 +98,8 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     });
 
     const handleSelectInventoryPart = (part: Part) => {
-        const isLabor = part.name.toUpperCase().includes('M.O.') || 
+        const isLabor = part.name.toUpperCase().includes('SERVICIO') || 
+                        part.name.toUpperCase().includes('M.O.') || 
                         part.name.toLowerCase().includes('mano de obra');
         
         const newItem = {
@@ -120,7 +110,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
         };
 
         if (isLabor) {
-            setServices(prev => [...prev.filter(s => s.descripcion || s.costo), newItem]);
+            setSpareParts(prev => [...prev, newItem]);
         } else {
             setSpareParts(prev => [...prev, newItem]);
         }
@@ -129,9 +119,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     };
 
     // Cost calculation
-    const totalServicesCost = services.reduce((acc, curr) => acc + (curr.costo || 0) * (curr.cantidad ?? 1), 0);
-    const totalSparePartsCost = spareParts.reduce((acc, curr) => acc + (curr.costo || 0) * (curr.cantidad ?? 1), 0);
-    const totalInvestment = totalServicesCost + totalSparePartsCost;
+    const totalInvestment = spareParts.reduce((acc, curr) => acc + (curr.costo || 0) * (curr.cantidad ?? 1), 0);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -159,16 +147,16 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                 quotation_total: totalInvestment,
                 mileage,
                 job_photos: jobPhotos,
-                services,
+                services: [],
                 spare_parts: spareParts,
             });
 
             // Deduct stock for newly-added inventory parts (both in parts and services)
             if (onUpdatePart) {
-                const allCurrentItems = [...spareParts, ...services];
-                for (const sp of allCurrentItems) {
+                for (const sp of spareParts) {
                     if (sp.part_id && !originalPartIds.current.includes(sp.part_id)) {
-                        const isLabor = sp.descripcion.toUpperCase().includes('M.O.') || 
+                        const isLabor = sp.descripcion.toUpperCase().includes('SERVICIO') || 
+                                        sp.descripcion.toUpperCase().includes('M.O.') || 
                                         sp.descripcion.toLowerCase().includes('mano de obra');
                         
                         if (isLabor) continue; // Skip stock deduction for labor items
@@ -270,7 +258,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                 </div>
                                 <div className="relative">
                                     <textarea
-                                        rows={4}
+                                        rows={8}
                                         className="w-full px-5 py-4 rounded-2xl border-2 border-zinc-100 focus:border-amber-500 outline-none transition-all resize-none text-zinc-800 text-sm disabled:bg-zinc-50 disabled:text-zinc-500 font-medium leading-relaxed bg-white"
                                         placeholder="Ingrese el diagnóstico o notas adicionales del servicio..."
                                         value={notes}
@@ -282,74 +270,12 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                             </div>
                         </div>
 
-                        {/* Desglose de Servicios */}
-                        <div className="space-y-5 pt-2">
-                            <div className="flex items-center justify-between border-b border-zinc-50 pb-2">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-1.5 h-4 rounded-full bg-emerald-500"></div>
-                                    <p className="text-[11px] font-black text-zinc-400 uppercase tracking-widest">Desglose de Servicios</p>
-                                </div>
-                                <span className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest">Valores en CLP</span>
-                            </div>
 
-                            <div className="space-y-2">
-                                {services.map((service, index) => (
-                                    <div key={index} className="flex gap-3 items-center group/row animate-in slide-in-from-left-2 duration-200" style={{ animationDelay: `${index * 50}ms` }}>
-                                        <div className="flex-1 relative">
-                                            <input
-                                                type="text"
-                                                placeholder="Descripción del servicio"
-                                                className="w-full px-4 py-3 rounded-xl border border-zinc-100 hover:border-zinc-200 focus:border-emerald-500 outline-none transition-all text-sm bg-zinc-50/50 font-medium"
-                                                value={service.descripcion}
-                                                onChange={(e) => handleServiceChange(index, 'descripcion', e.target.value)}
-                                                disabled={isFinalized}
-                                            />
-                                        </div>
-                                        <div className="w-20 relative">
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                placeholder="Cant."
-                                                className="w-full px-3 py-3 rounded-xl border border-zinc-100 hover:border-zinc-200 focus:border-emerald-500 outline-none transition-all text-sm font-bold text-center bg-zinc-50/50"
-                                                value={service.cantidad ?? ''}
-                                                onChange={(e) => handleServiceChange(index, 'cantidad', e.target.value)}
-                                                disabled={isFinalized}
-                                            />
-                                        </div>
-                                        <div className="w-32 relative">
-                                            <input
-                                                type="number"
-                                                placeholder="Costo"
-                                                className="w-full px-4 py-3 rounded-xl border border-zinc-100 hover:border-zinc-200 focus:border-emerald-500 outline-none transition-all text-sm font-black pl-7 bg-zinc-50/50"
-                                                value={service.costo || ''}
-                                                onChange={(e) => handleServiceChange(index, 'costo', e.target.value)}
-                                                disabled={isFinalized}
-                                            />
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-300">$</span>
-                                        </div>
-                                        {!isFinalized && (
-                                            <button type="button" onClick={() => handleRemoveService(index)} className="p-2 text-zinc-200 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-
-                            {!isFinalized && (
-                                <button type="button" onClick={handleAddService} className="flex items-center gap-2 text-xs font-black text-emerald-600 hover:bg-emerald-50 px-4 py-2 rounded-xl transition-all border border-emerald-100 border-dashed">
-                                    <PlusCircle className="w-4 h-4" />
-                                    AGREGAR SERVICIO
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Desglose de Repuestos - con búsqueda de inventario */}
                         <div className="space-y-5 pt-2">
                             <div className="flex items-center justify-between border-b border-zinc-50 pb-2">
                                 <div className="flex items-center gap-3">
                                     <div className="w-1.5 h-4 rounded-full bg-blue-500"></div>
-                                    <p className="text-[11px] font-black text-zinc-400 uppercase tracking-widest">Desglose de Repuestos</p>
+                                    <p className="text-[11px] font-black text-zinc-400 uppercase tracking-widest">Desglose de Servicios</p>
                                 </div>
                                 <span className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest">Valores en CLP</span>
                             </div>
@@ -375,7 +301,8 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                                 <div className="p-3 text-xs text-zinc-400 text-center italic">Sin resultados en inventario</div>
                                             ) : (
                                                 filteredInventory.map(part => {
-                                                    const isLabor = part.name.toUpperCase().includes('M.O.') || 
+                                                    const isLabor = part.name.toUpperCase().includes('SERVICIO') || 
+                                                                    part.name.toUpperCase().includes('M.O.') || 
                                                                     part.name.toLowerCase().includes('mano de obra');
                                                     const isOutOfStock = part.stock === 0 && !isLabor;
                                                     return (
@@ -417,7 +344,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                             <div className="space-y-2">
                                 {spareParts.length === 0 && !isFinalized && (
                                     <p className="text-[10px] text-zinc-400 italic text-center py-4 bg-zinc-50/50 rounded-xl border border-dashed border-zinc-100">
-                                        Busca en el inventario o añade un repuesto manual.
+                                        Busca en el inventario o añade un servicio extra.
                                     </p>
                                 )}
                                 {spareParts.map((part, index) => (
@@ -428,7 +355,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                             )}
                                             <input
                                                 type="text"
-                                                placeholder="Descripción del repuesto"
+                                                placeholder="Descripción"
                                                 className={cn(
                                                     "w-full px-4 py-3 rounded-xl border border-zinc-100 hover:border-zinc-200 focus:border-blue-500 outline-none transition-all text-sm bg-zinc-50/50 font-medium",
                                                     part.part_id && "pl-9 text-blue-700 bg-blue-50/50 border-blue-100"
@@ -478,7 +405,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                 {!isFinalized && (
                                     <button type="button" onClick={handleAddSparePart} className="flex items-center gap-2 text-xs font-black text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-xl transition-all border border-blue-100 border-dashed">
                                         <PlusCircle className="w-4 h-4" />
-                                        AGREGAR REPUESTO MANUAL
+                                        AGREGAR SERVICIO EXTRA
                                     </button>
                                 )}
                             </div>

@@ -14,7 +14,10 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case 'Ingresado': return 'text-zinc-500 bg-zinc-100 border-zinc-200';
     case 'En Espera': return 'text-amber-600 bg-amber-50 border-amber-200';
-    case 'En Mantención': return 'text-blue-600 bg-blue-50 border-blue-200';
+    case 'En Mantención': 
+    case 'En Reparación':
+    case 'Elevador 1': return 'text-blue-600 bg-blue-50 border-blue-200';
+    case 'Elevador 2': return 'text-indigo-600 bg-indigo-50 border-indigo-200';
     case 'Listo para Entrega': return 'text-emerald-600 bg-emerald-50 border-emerald-200';
     case 'Finalizado': return 'text-zinc-100 bg-zinc-800 border-zinc-700';
     default: return 'text-zinc-500 bg-zinc-100 border-zinc-200';

@@ -142,6 +142,8 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
     'Ingresado',
     'En Espera',
     'En Mantención',
+    'Elevador 1',
+    'Elevador 2',
     'Listo para Entrega',
     'Finalizado'
   ];

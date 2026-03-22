@@ -3,6 +3,8 @@ export type TicketStatus =
   | 'En Espera'
   | 'En Mantención'
   | 'En Reparación'
+  | 'Elevador 1'
+  | 'Elevador 2'
   | 'Listo para Entrega'
   | 'Finalizado'
   | 'Entregado'; // Estado oculto para CRM
