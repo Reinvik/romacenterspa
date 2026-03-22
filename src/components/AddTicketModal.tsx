@@ -455,7 +455,7 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
               <h3 className="text-base font-black text-zinc-900 uppercase tracking-widest">Observaciones de Ingreso</h3>
             </div>
             <textarea
-              rows={5}
+              rows={10}
               placeholder="Notas adicionales o motivo de ingreso..."
               className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all resize-none font-medium text-sm"
               value={formData.notes}

@@ -258,7 +258,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                 </div>
                                 <div className="relative">
                                     <textarea
-                                        rows={8}
+                                        rows={12}
                                         className="w-full px-5 py-4 rounded-2xl border-2 border-zinc-100 focus:border-amber-500 outline-none transition-all resize-none text-zinc-800 text-sm disabled:bg-zinc-50 disabled:text-zinc-500 font-medium leading-relaxed bg-white"
                                         placeholder="Ingrese el diagnóstico o notas adicionales del servicio..."
                                         value={notes}
