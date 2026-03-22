@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { GarageSettings } from '../types';
-import { Save, Building2, MapPin, Phone, MessageSquare, Loader2, CheckCircle, Palette } from 'lucide-react';
+import { Save, Building2, MapPin, Phone, MessageSquare, Loader2, CheckCircle, Palette, Download, FileSpreadsheet } from 'lucide-react';
+import { Ticket, Part } from '../types';
 import { cn } from '../lib/utils';
 
 interface SettingsFormProps {
     settings: GarageSettings | null;
     onUpdate: (updates: Partial<GarageSettings>) => Promise<void>;
+    tickets?: Ticket[];
+    parts?: Part[];
 }
 
-export function SettingsForm({ settings, onUpdate }: SettingsFormProps) {
+export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFormProps) {
     const [formData, setFormData] = useState<Partial<GarageSettings>>({
         workshop_name: '',
         address: '',
@@ -24,7 +27,7 @@ export function SettingsForm({ settings, onUpdate }: SettingsFormProps) {
     });
     const [loading, setLoading] = useState(false);
     const [saved, setSaved] = useState(false);
-    const [activeTab, setActiveTab] = useState<'general' | 'design'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'design' | 'export'>('general');
 
     useEffect(() => {
         if (settings) {
@@ -57,6 +60,72 @@ export function SettingsForm({ settings, onUpdate }: SettingsFormProps) {
             setLoading(false);
         }
     };
+    
+    const downloadCSV = (data: any[], filename: string) => {
+        if (!data || data.length === 0) {
+            alert('No hay datos para exportar.');
+            return;
+        }
+
+        const headers = Object.keys(data[0]);
+        const csvContent = [
+            headers.join(','),
+            ...data.map(row => headers.map(header => {
+                const value = row[header] === null || row[header] === undefined ? '' : row[header];
+                const escaped = ('' + value).replace(/"/g, '""');
+                return `"${escaped}"`;
+            }).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleExportTickets = () => {
+        if (!tickets) {
+            alert('Cargando tickets...');
+            return;
+        }
+        
+        const exportData = tickets.map(t => ({
+            Patente: t.id,
+            Cliente: t.owner_name,
+            Telefono: t.owner_phone,
+            Modelo: t.model,
+            KM: t.mileage,
+            Estado: t.status,
+            'Fecha Ingreso': t.entry_date ? new Date(t.entry_date).toLocaleDateString() : '',
+            'Ultimo Cambio Estado': t.last_status_change ? new Date(t.last_status_change).toLocaleDateString() : '',
+            Mecanico: t.mechanic || 'Sin asignar',
+            Notas: t.notes || ''
+        }));
+
+        downloadCSV(exportData, 'tickets_roma_center');
+    };
+
+    const handleExportParts = () => {
+        if (!parts) {
+            alert('Cargando repuestos...');
+            return;
+        }
+
+        const exportData = parts.map(p => ({
+            Codigo: p.id,
+            Nombre: p.name,
+            Stock: p.stock,
+            'Stock Minimo': p.min_stock,
+            Precio: p.price
+        }));
+
+        downloadCSV(exportData, 'repuestos_roma_center');
+    };
 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden font-sans">
@@ -77,6 +146,13 @@ export function SettingsForm({ settings, onUpdate }: SettingsFormProps) {
                         className={cn("flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-sm transition-all", activeTab === 'design' ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300")}
                     >
                         <Palette className="w-4 h-4" /> Diseño
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={() => setActiveTab('export')}
+                        className={cn("flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-sm transition-all", activeTab === 'export' ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300")}
+                    >
+                        <Download className="w-4 h-4" /> Exportar
                     </button>
                 </div>
             </div>
@@ -260,6 +336,52 @@ export function SettingsForm({ settings, onUpdate }: SettingsFormProps) {
                 </div>
 
                 </>
+                ) : activeTab === 'export' ? (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <p className="text-sm text-zinc-600 mb-6">Exporta tus datos en formato CSV para usarlos en Excel u otras aplicaciones.</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       <div className="p-6 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-4 hover:shadow-md transition-shadow">
+                           <div className="flex items-center gap-3">
+                               <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                                   <FileSpreadsheet className="w-6 h-6" />
+                               </div>
+                               <div>
+                                   <h3 className="font-bold text-zinc-900">Tickets / Ordenes</h3>
+                                   <p className="text-xs text-zinc-500">Historial completo de servicios y vehículos.</p>
+                               </div>
+                           </div>
+                           <button
+                               type="button"
+                               onClick={handleExportTickets}
+                               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-zinc-200 hover:border-blue-400 hover:text-blue-600 text-zinc-700 font-bold rounded-xl transition-all shadow-sm active:scale-95"
+                           >
+                               <Download className="w-4 h-4" />
+                               Exportar Tickets (.csv)
+                           </button>
+                       </div>
+
+                       <div className="p-6 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-4 hover:shadow-md transition-shadow">
+                           <div className="flex items-center gap-3">
+                               <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
+                                   <FileSpreadsheet className="w-6 h-6" />
+                               </div>
+                               <div>
+                                   <h3 className="font-bold text-zinc-900">Inventario / Repuestos</h3>
+                                   <p className="text-xs text-zinc-500">Listado de productos, stock y precios.</p>
+                               </div>
+                           </div>
+                           <button
+                               type="button"
+                               onClick={handleExportParts}
+                               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-zinc-200 hover:border-emerald-400 hover:text-emerald-600 text-zinc-700 font-bold rounded-xl transition-all shadow-sm active:scale-95"
+                           >
+                               <Download className="w-4 h-4" />
+                               Exportar Repuestos (.csv)
+                           </button>
+                       </div>
+                    </div>
+                </div>
                 ) : (
                 <div className="space-y-6">
                      <p className="text-sm text-zinc-600 mb-6">Personaliza los colores de la barra lateral para que coincidan con la identidad corporativa de tu marca.</p>
@@ -334,6 +456,7 @@ export function SettingsForm({ settings, onUpdate }: SettingsFormProps) {
                 </div>
                 )}
 
+                {activeTab !== 'export' && (
                 <div className="pt-6 flex items-center justify-between border-t border-zinc-100">
                     {saved && (
                         <span className="text-sm font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2" style={{ color: formData.theme_menu_highlight }}>
@@ -350,6 +473,7 @@ export function SettingsForm({ settings, onUpdate }: SettingsFormProps) {
                         {loading ? 'Guardando...' : 'Guardar Cambios'}
                     </button>
                 </div>
+                )}
             </form>
         </div>
     );

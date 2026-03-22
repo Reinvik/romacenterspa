@@ -325,7 +325,12 @@ export default function App() {
 
       {activeTab === 'settings' && (
         <div className="p-8">
-          <SettingsForm settings={settings} onUpdate={updateSettings} />
+          <SettingsForm 
+            settings={settings} 
+            onUpdate={updateSettings} 
+            tickets={tickets}
+            parts={parts}
+          />
         </div>
       )}
 
