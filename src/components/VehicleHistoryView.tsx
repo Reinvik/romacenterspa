@@ -1,6 +1,6 @@
 import React from 'react';
 import { Car, Calendar, History, Wrench, MessageSquare, Tag, Phone } from 'lucide-react';
-import { Ticket } from '../types';
+import { Ticket, ServiceLogEntry } from '../types';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -13,9 +13,56 @@ export function VehicleHistoryView({ ticket, settings }: VehicleHistoryViewProps
   const primaryColor = settings?.theme_menu_highlight || '#10b981';
   const primaryBg = primaryColor.startsWith('#') && primaryColor.length === 7 ? `${primaryColor}20` : 'rgba(16, 185, 129, 0.2)';
 
-  const pastVisits = ticket.service_log || [];
-  const totalVisits = pastVisits.length + 1;
-  const firstVisitDate = pastVisits.length > 0 ? pastVisits[0].date : ticket.entry_date;
+  // Función para parsear el historial desde el campo "notes" si existe en formato de texto
+  const parseHistoryFromNotes = (notes: string): ServiceLogEntry[] => {
+    if (!notes || !notes.includes('Historial de Visitas:')) return [];
+    
+    const entries: ServiceLogEntry[] = [];
+    const lines = notes.split('\n');
+    const historyRegex = /- \[(\d{4}-\d{2}-\d{2})\] (.*?)(?: \((\$\d+(?:\.\d+)*)\))?$/;
+
+    lines.forEach(line => {
+      const match = line.match(historyRegex);
+      if (match) {
+        const [_, date, description, costStr] = match;
+        // Limpiar costo de formato $82.000 a número
+        const cost = costStr ? parseInt(costStr.replace('$', '').replace(/\./g, '')) : undefined;
+        
+        entries.push({
+          date,
+          notes: description.trim(),
+          parts: [], // En el formato de texto no diferenciamos repuestos de servicios
+          cost,
+          mileage: undefined
+        });
+      }
+    });
+
+    return entries;
+  };
+
+  // Combinar service_log con lo parseado de notes
+  const parsedFromNotes = parseHistoryFromNotes(ticket.notes || '');
+  const allVisits = [...(ticket.service_log || []), ...parsedFromNotes];
+  
+  // Eliminar duplicados básicos por fecha y notas (muy básico)
+  const uniqueVisits = allVisits.reduce((acc: ServiceLogEntry[], current) => {
+    const isDuplicate = acc.some(item => item.date === current.date && item.notes === current.notes);
+    if (!isDuplicate) acc.push(current);
+    return acc;
+  }, []);
+
+  // Ordenar por fecha descendente
+  const pastVisits = uniqueVisits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  
+  const totalVisits = pastVisits.length + (ticket.status !== 'Entregado' ? 1 : 0);
+  const firstVisitDate = pastVisits.length > 0 ? pastVisits[pastVisits.length - 1].date : ticket.entry_date;
+
+  // Limpiar las notas actuales para no mostrar el bloque de historial si ya lo parseamos
+  const displayNotes = (ticket.notes || '')
+    .split('Historial de Visitas:')[0]
+    .replace(/^- \[\d{4}-\d{2}-\d{2}\].*$/gm, '') // Por si acaso quedaron líneas sueltas
+    .trim();
 
   return (
     <div className="flex flex-col gap-6 h-full font-sans">
@@ -95,14 +142,14 @@ export function VehicleHistoryView({ ticket, settings }: VehicleHistoryViewProps
                   ) : null}
 
                   <p className="text-[11px] text-zinc-600 line-clamp-3 italic bg-zinc-50/30 p-2 rounded-lg border border-dashed border-zinc-100">
-                    {ticket.notes || 'Sin notas adicionales'}
+                    {displayNotes || 'Sin notas adicionales'}
                   </p>
                 </div>
               </div>
             )}
 
             {/* Visitas Pasadas */}
-            {pastVisits.slice().reverse().map((visit, idx) => (
+            {pastVisits.map((visit, idx) => (
               <div key={idx} className="relative flex items-start gap-4">
                 <div className="w-8 h-8 rounded-full border-4 border-white bg-zinc-100 flex items-center justify-center z-10 text-zinc-400 flex-shrink-0 shadow-sm">
                   <History className="w-3.5 h-3.5" />
@@ -115,7 +162,13 @@ export function VehicleHistoryView({ ticket, settings }: VehicleHistoryViewProps
                     </div>
                   </div>
                   <div className="text-[9px] text-zinc-400 mb-2">
-                    {format(parseISO(visit.date), "d MMM, yyyy", { locale: es })} 
+                    {(() => {
+                        try {
+                            return format(parseISO(visit.date), "d MMM, yyyy", { locale: es });
+                        } catch (e) {
+                            return visit.date;
+                        }
+                    })()} 
                     {visit.mileage ? ` • ${visit.mileage.toLocaleString()} km` : ''}
                   </div>
 
@@ -137,7 +190,7 @@ export function VehicleHistoryView({ ticket, settings }: VehicleHistoryViewProps
               </div>
             ))}
             
-            {pastVisits.length === 0 && ticket.status === 'Entregado' && (
+            {pastVisits.length === 0 && (ticket.status === 'Entregado' || ticket.status === 'Finalizado') && (
                <div className="text-center py-4 text-[11px] text-zinc-400 italic">Sin historial previo.</div>
             )}
           </div>
