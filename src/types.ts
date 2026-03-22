@@ -57,6 +57,8 @@ export interface Ticket {
   job_photos?: string[];
   services?: ServiceItem[];
   spare_parts?: ServiceItem[];
+  preventive_dismissed?: boolean;
+  dismissed_at?: string;
   created_at?: string;
 }
 

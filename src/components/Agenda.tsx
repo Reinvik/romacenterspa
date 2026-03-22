@@ -12,8 +12,11 @@ import {
     Search,
     ChevronLeft,
     ChevronRight,
-    CalendarDays
+    CalendarDays,
+    ClipboardList,
+    XCircle
 } from 'lucide-react';
+import { VehicleHistoryView } from './VehicleHistoryView';
 import {
     format,
     startOfMonth,
@@ -73,6 +76,11 @@ export function Agenda({
     const [editingTimeId, setEditingTimeId] = useState<string | null>(null);
     const [editingTimeValue, setEditingTimeValue] = useState('');
     const [saving, setSaving] = useState(false);
+    
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [selectedHistoryVehicleId, setSelectedHistoryVehicleId] = useState<string | null>(null);
+
+    const { dismissPreventive } = useGarageStore();
 
     // Fetch occupied slots for the selected form date
     React.useEffect(() => {
@@ -86,8 +94,8 @@ export function Agenda({
     // Lógica para Mantenimientos Preventivos (8-9 meses)
     const preventiveTickets = useMemo(() => {
         const now = new Date();
-        const minDate = subMonths(now, 10);
-        const maxDate = subMonths(now, 6);
+        const minDate = subMonths(now, 9);
+        const maxDate = subMonths(now, 8);
 
         // Agrupar por patente para tener solo el servicio más reciente
         const latestByPatente: Record<string, Ticket> = {};
@@ -98,8 +106,9 @@ export function Agenda({
             const closeDate = parseISO(ticket.close_date);
             const isFinished = ticket.status === 'Finalizado' || ticket.status === 'Entregado';
             const isInRange = closeDate >= minDate && closeDate <= maxDate;
+            const isNotDismissed = !ticket.preventive_dismissed;
 
-            if (isFinished && isInRange) {
+            if (isFinished && isInRange && isNotDismissed) {
                 const searchContent = `${ticket.notes || ''} ${ticket.services?.map(s => s.descripcion).join(' ') || ''}`.toLowerCase();
                 const isLubricant = searchContent.includes('aceite') || searchContent.includes('lubricante');
 
@@ -467,9 +476,33 @@ export function Agenda({
                                             )}
                                         </div>
 
+                                        <div className="grid grid-cols-2 gap-2 mt-4">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedHistoryVehicleId(ticket.id);
+                                                    setIsHistoryModalOpen(true);
+                                                }}
+                                                className="flex h-11 items-center justify-center gap-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 rounded-2xl font-black text-[10px] transition-all uppercase tracking-wider"
+                                            >
+                                                <ClipboardList className="w-4 h-4" />
+                                                Hoja de Vida
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm('¿Seguro que desea quitar este vehículo del menú de mantenimientos?')) {
+                                                        dismissPreventive(ticket.id);
+                                                    }
+                                                }}
+                                                className="flex h-11 items-center justify-center gap-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-2xl font-black text-[10px] transition-all uppercase tracking-wider"
+                                            >
+                                                <XCircle className="w-4 h-4" />
+                                                Quitar
+                                            </button>
+                                        </div>
+
                                         <button
                                             onClick={() => sendPreventiveWhatsApp(ticket)}
-                                            className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-[11px] transition-all shadow-lg shadow-emerald-500/20 uppercase tracking-wider"
+                                            className="w-full flex h-11 items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-[10px] transition-all shadow-lg shadow-emerald-500/20 uppercase tracking-wider mt-2"
                                         >
                                             <Send className="w-4 h-4" />
                                             Enviar Recordatorio
@@ -892,6 +925,36 @@ export function Agenda({
                                 {saving ? 'Agendando...' : 'Agendar Recordatorio'}
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Historial de Vehículo */}
+            {isHistoryModalOpen && selectedHistoryVehicleId && (
+                <div className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-zinc-100 flex justify-between items-center bg-zinc-50/50">
+                            <div>
+                                <h3 className="text-xl font-black text-zinc-900 uppercase tracking-tight">Hoja de Vida del Vehículo</h3>
+                                <p className="text-sm text-zinc-500">Historial completo de servicios y mantenciones.</p>
+                            </div>
+                            <button 
+                                onClick={() => {
+                                    setIsHistoryModalOpen(false);
+                                    setSelectedHistoryVehicleId(null);
+                                }}
+                                className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-white rounded-xl border border-transparent hover:border-zinc-200 transition-all font-sans"
+                            >
+                                <Plus className="w-6 h-6 rotate-45" />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6 bg-zinc-50/30 font-sans">
+                            {(() => {
+                                const ticket = tickets.find(t => t.id === selectedHistoryVehicleId);
+                                if (!ticket) return <div className="p-10 text-center text-zinc-500">No se encontró historial para este vehículo.</div>;
+                                return <VehicleHistoryView ticket={ticket} settings={settings} />;
+                            })()}
+                        </div>
                     </div>
                 </div>
             )}

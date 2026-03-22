@@ -993,6 +993,22 @@ export function useGarageStore(companyId?: string) {
     }
   }, [fetchData]);
 
+  const dismissPreventive = useCallback(async (ticketId: string) => {
+    try {
+      const { error } = await supabaseGarage.from('garage_tickets')
+        .update({ 
+            preventive_dismissed: true, 
+            dismissed_at: new Date().toISOString() 
+        })
+        .eq('id', ticketId);
+      if (error) throw error;
+      await fetchData();
+    } catch (error) {
+      console.error('Error dismissing preventive:', error);
+      throw error;
+    }
+  }, [fetchData]);
+
   return {
     tickets,
     mechanics,
@@ -1024,6 +1040,7 @@ export function useGarageStore(companyId?: string) {
     markNotificationAsRead,
     acceptQuotation,
     clearFinishedTickets,
+    dismissPreventive,
     refreshData: fetchData,
     searchTicket,
     searchTicketsHistory,
