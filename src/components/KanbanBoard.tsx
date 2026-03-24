@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Ticket, TicketStatus, Mechanic, Reminder } from '../types';
+import { Ticket, TicketStatus, Mechanic, Reminder, PaymentMethod } from '../types';
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
@@ -33,11 +33,12 @@ import { TicketHistoryModal } from './TicketHistoryModal';
 import { VehicleCRMModal } from './VehicleCRMModal';
 import { KanbanReminderCard } from './KanbanReminderCard';
 import { GarageSettings } from '../types';
+import { FinishTicketModal } from './FinishTicketModal';
 
 interface KanbanBoardProps {
   tickets: Ticket[];
   mechanics: Mechanic[];
-  onUpdateStatus: (id: string, status: TicketStatus, changedBy?: string) => void;
+  onUpdateStatus: (id: string, status: TicketStatus, changedBy?: string, paymentMethod?: PaymentMethod) => void;
   onShowHistory?: (ticket: Ticket) => void;
   onShowCRM?: (ticket: Ticket) => void;
   onEditTicket: (ticket: Ticket) => void;
@@ -519,13 +520,11 @@ export function KanbanBoard({
         onCancel={() => setShowClearConfirm(false)}
       />
 
-      <ConfirmModal
+      <FinishTicketModal
         isOpen={!!finishConfirmPending}
-        title="Finalizar Trabajo"
-        message="¿Estás seguro de finalizar este trabajo? Una vez finalizado, la tarjeta quedará bloqueada y no se podrá modificar ni mover."
-        onConfirm={() => {
+        onConfirm={(method) => {
           if (finishConfirmPending) {
-            onUpdateStatus(finishConfirmPending.id, 'Finalizado', finishConfirmPending.action);
+            onUpdateStatus(finishConfirmPending.id, 'Finalizado', finishConfirmPending.action, method);
             setFinishConfirmPending(null);
           }
         }}

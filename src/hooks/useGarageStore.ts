@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Ticket, TicketStatus, Mechanic, Part, Customer, GarageSettings, Reminder, GarageNotification, SalaVenta, SalaVentaItem } from '../types';
+import { Ticket, TicketStatus, Mechanic, Part, Customer, GarageSettings, Reminder, GarageNotification, SalaVenta, SalaVentaItem, PaymentMethod } from '../types';
 import { supabase, supabaseGarage } from '../lib/supabase';
 
 export const TIME_SLOTS = [
@@ -282,7 +282,7 @@ export function useGarageStore(companyId?: string) {
     }
   }, [companyId, fetchData]);
 
-  const updateTicketStatus = useCallback(async (ticketId: string, status: TicketStatus, changedBy: string = 'Recepción/Admin') => {
+  const updateTicketStatus = useCallback(async (ticketId: string, status: TicketStatus, changedBy: string = 'Recepción/Admin', paymentMethod?: PaymentMethod) => {
     const now = new Date().toISOString();
     let originalTicket: Ticket | undefined;
 
@@ -305,7 +305,8 @@ export function useGarageStore(companyId?: string) {
         .update({
           status,
           last_status_change: now,
-          close_date: status === 'Finalizado' ? now : null
+          close_date: status === 'Finalizado' ? now : null,
+          payment_method: paymentMethod
         })
         .eq('id', ticketId);
 
@@ -520,6 +521,7 @@ export function useGarageStore(companyId?: string) {
       if (updates.services !== undefined) dbUpdates.services = updates.services;
       if (updates.spare_parts !== undefined) dbUpdates.spare_parts = updates.spare_parts;
       if (updates.cost !== undefined) dbUpdates.cost = updates.cost;
+      if (updates.payment_method !== undefined) dbUpdates.payment_method = updates.payment_method;
 
       if (updates.mechanic_id !== undefined) {
         dbUpdates.mechanic = updates.mechanic_id === 'Sin asignar' ? null : updates.mechanic_id;
@@ -1034,7 +1036,7 @@ export function useGarageStore(companyId?: string) {
     }
   }, [companyId]);
 
-  const addSalaVenta = useCallback(async (items: SalaVentaItem[], notes?: string) => {
+  const addSalaVenta = useCallback(async (items: SalaVentaItem[], paymentMethod: PaymentMethod, notes?: string) => {
     if (!companyId) return;
     const total = items.reduce((acc, i) => acc + i.subtotal, 0);
     try {
@@ -1043,6 +1045,7 @@ export function useGarageStore(companyId?: string) {
         company_id: companyId,
         items,
         total,
+        payment_method: paymentMethod,
         notes: notes || null,
         sold_at: new Date().toISOString()
       }]);

@@ -52,9 +52,9 @@ export function Layout({
 
   const navItems = [
     { id: 'dashboard', label: 'Tablero Kanban', icon: LayoutDashboard },
-    { id: 'sales', label: 'Inf. ventas', icon: BarChart3 },
+    { id: 'sales', label: 'Informe de Ventas', icon: BarChart3 },
     { id: 'sala_ventas', label: 'Sala Ventas', icon: ShoppingCart },
-    { id: 'inventory', label: 'Repuestos', icon: Package },
+    { id: 'inventory', label: 'Inventario', icon: Package },
     { id: 'customers', label: 'Clientes', icon: Users },
     { id: 'mechanics', label: 'Mecánicos', icon: Wrench },
     { id: 'agenda', label: 'Agenda', icon: Calendar },

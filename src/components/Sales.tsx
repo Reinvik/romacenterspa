@@ -2,10 +2,11 @@ import React, { useMemo, useState } from 'react';
 import { 
   BarChart3, TrendingUp, DollarSign, ShoppingBag, 
   ArrowUpRight, ArrowDownRight, Package, Calendar, 
-  ChevronRight, Search, Filter, Download, Info
+  ChevronRight, Search, Filter, Download, Info, Wrench,
+  Banknote, CreditCard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format, subDays, startOfDay, endOfDay, isWithinInterval, parseISO } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, isWithinInterval, parseISO, eachMonthOfInterval, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { Ticket, Part, GarageSettings, SalaVenta } from '../types';
@@ -18,7 +19,8 @@ interface SalesProps {
 }
 
 export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps) {
-  const [timeRange, setTimeRange] = useState('7d'); // 7d, 30d, all
+  const [timeRange, setTimeRange] = useState<'1d' | '7d' | '30d' | 'all'>('7d');
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
 
   // Helper: get the best available amount for a ticket
@@ -41,16 +43,26 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
   const filteredSales = useMemo(() => {
     const now = new Date();
     let startDate: Date | null = null;
+    let endDate: Date | null = null;
 
-    if (timeRange === '7d') startDate = subDays(now, 7);
-    else if (timeRange === '30d') startDate = subDays(now, 30);
+    if (timeRange === '1d') {
+      startDate = startOfDay(parseISO(selectedDate));
+      endDate = endOfDay(parseISO(selectedDate));
+    } else if (timeRange === '7d') {
+      startDate = subDays(now, 7);
+    } else if (timeRange === '30d') {
+      startDate = subDays(now, 30);
+    }
 
     return salesTickets.filter(t => {
       const closeDateStr = t.close_date || t.last_status_change || t.entry_date;
       const closeDate = closeDateStr ? parseISO(closeDateStr) : null;
       if (!closeDate) return false;
       
-      const isInRange = !startDate || closeDate >= startDate;
+      const isInRange = timeRange === '1d' 
+        ? isWithinInterval(closeDate, { start: startDate!, end: endDate! })
+        : (!startDate || closeDate >= startDate);
+      
       const matchesSearch = !searchTerm || 
         t.owner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -76,6 +88,11 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
 
     const filteredSalaVentas = salaVentas.filter(v => {
       const d = parseISO(v.sold_at);
+      if (timeRange === '1d') {
+        const s = startOfDay(parseISO(selectedDate));
+        const e = endOfDay(parseISO(selectedDate));
+        return isWithinInterval(d, { start: s, end: e });
+      }
       return !startDate || d >= startDate;
     });
     const mesaRevenue = filteredSalaVentas.reduce((acc, v) => acc + v.total, 0);
@@ -96,21 +113,60 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
       return isWithinInterval(d, { start: todayStart, end: todayEnd });
     }).reduce((acc, v) => acc + v.total, 0);
 
+    const cashRevenue = filteredSales.filter(t => (t as any).payment_method === 'Efectivo').reduce((acc, t) => acc + getTicketAmount(t), 0) +
+                        filteredSalaVentas.filter(v => (v as any).payment_method === 'Efectivo').reduce((acc, v) => acc + v.total, 0);
+    const cardRevenue = filteredSales.filter(t => (t as any).payment_method === 'Tarjeta').reduce((acc, t) => acc + getTicketAmount(t), 0) +
+                        filteredSalaVentas.filter(v => (v as any).payment_method === 'Tarjeta').reduce((acc, v) => acc + v.total, 0);
+
     return {
       totalRevenue,
       salesCount: totalCount,
-      ticketRevenue,
-      mesaRevenue,
-      avgTicket,
-      todayRevenue,
+      cashRevenue,
+      cardRevenue,
       revenueTrend: 12.5,
     };
-  }, [filteredSales, salaVentas, timeRange]);
+  }, [filteredSales, salaVentas, timeRange, selectedDate]);
 
-  // 4. Data for Chart (Daily Sales)
+  // 4. Data for Chart (Daily or Monthly Sales)
   const chartData = useMemo(() => {
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = subDays(new Date(), 6 - i);
+    if (timeRange === 'all') {
+      // Last 12 months
+      const end = new Date();
+      const start = subMonths(end, 11);
+      const months = eachMonthOfInterval({ start, end });
+
+      const data = months.map(month => {
+        const mStart = startOfMonth(month);
+        const mEnd = endOfMonth(month);
+
+        const mSales = salesTickets.filter(t => {
+          const closeDateStr = t.close_date || t.last_status_change || t.entry_date;
+          const closeDate = closeDateStr ? parseISO(closeDateStr) : null;
+          return closeDate && isWithinInterval(closeDate, { start: mStart, end: mEnd });
+        });
+
+        const total = mSales.reduce((acc, t) => acc + getTicketAmount(t), 0)
+              + salaVentas.filter(v => {
+                  const d = parseISO(v.sold_at);
+                  return isWithinInterval(d, { start: mStart, end: mEnd });
+                }).reduce((acc, v) => acc + v.total, 0);
+
+        return {
+          label: format(month, 'MMM', { locale: es }),
+          fullDate: format(month, 'MMMM yyyy', { locale: es }),
+          total,
+          count: mSales.length
+        };
+      });
+
+      const maxVal = Math.max(...data.map(d => d.total), 1);
+      return data.map(d => ({ ...d, height: (d.total / maxVal) * 100 }));
+    }
+
+    const daysCount = timeRange === '7d' ? 7 : 30;
+    
+    const data = Array.from({ length: daysCount }, (_, i) => {
+      const date = subDays(new Date(), daysCount - 1 - i);
       const dayStart = startOfDay(date);
       const dayEnd = endOfDay(date);
       
@@ -121,7 +177,8 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
       });
 
       return {
-        label: format(date, 'EEE', { locale: es }),
+        label: daysCount > 15 ? format(date, 'd') : format(date, 'EEE', { locale: es }),
+        fullDate: format(date, 'dd/MM'),
         total: daySales.reduce((acc, t) => acc + getTicketAmount(t), 0)
               + salaVentas.filter(v => {
                   const d = parseISO(v.sold_at);
@@ -131,12 +188,98 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
       };
     });
 
-    const maxVal = Math.max(...last7Days.map(d => d.total), 1);
-    return last7Days.map(d => ({
+    const maxVal = Math.max(...data.map(d => d.total), 1);
+    return data.map(d => ({
       ...d,
       height: (d.total / maxVal) * 100
     }));
-  }, [salesTickets, salaVentas]); // Added salaVentas to dependencies
+  }, [salesTickets, salaVentas, timeRange]);
+
+  // 5. TOP SELLERS calculation
+  const topSellers = useMemo(() => {
+    const servicesMap: Record<string, { qty: number; total: number }> = {};
+    const productsMap: Record<string, { qty: number; total: number }> = {};
+
+    const isLabor = (name: string) => {
+      const n = name.toLowerCase();
+      return n.includes('servicio') || n.includes('m.o.') || n.includes('mano de obra');
+    };
+
+    filteredSales.forEach(t => {
+      // From spare_parts (sometimes services are here if not separated)
+      (t.spare_parts || []).forEach(sp => {
+        const map = isLabor(sp.descripcion) ? servicesMap : productsMap;
+        if (!map[sp.descripcion]) map[sp.descripcion] = { qty: 0, total: 0 };
+        map[sp.descripcion].qty += (sp.cantidad || 1);
+        map[sp.descripcion].total += (sp.costo || 0) * (sp.cantidad || 1);
+      });
+      // From services
+      (t.services || []).forEach(s => {
+        if (!servicesMap[s.descripcion]) servicesMap[s.descripcion] = { qty: 0, total: 0 };
+        servicesMap[s.descripcion].qty += (s.cantidad || 1);
+        servicesMap[s.descripcion].total += (s.costo || 0) * (s.cantidad || 1);
+      });
+    });
+
+    // From Sala Ventas
+    const now = new Date();
+    let startDate: Date | null = null;
+    if (timeRange === '7d') startDate = subDays(now, 7);
+    else if (timeRange === '30d') startDate = subDays(now, 30);
+
+    salaVentas.filter(v => !startDate || parseISO(v.sold_at) >= startDate).forEach(v => {
+      v.items.forEach(item => {
+        const map = isLabor(item.nombre) ? servicesMap : productsMap;
+        if (!map[item.nombre]) map[item.nombre] = { qty: 0, total: 0 };
+        map[item.nombre].qty += item.cantidad;
+        map[item.nombre].total += item.subtotal;
+      });
+    });
+
+    const sortAndSlice = (map: Record<string, any>) => 
+      Object.entries(map)
+        .map(([name, data]) => ({ name, ...data }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+
+    return {
+      services: sortAndSlice(servicesMap),
+      products: sortAndSlice(productsMap)
+    };
+  }, [filteredSales, salaVentas, timeRange]);
+
+  const handleDownload = () => {
+    const headers = ["ID", "Fecha", "Tipo", "Descripción/Cliente", "Monto"];
+    const rows = filteredSales.map(t => [
+      t.id,
+      format(parseISO(t.close_date || t.last_status_change || t.entry_date), 'yyyy-MM-dd'),
+      "Servicio",
+      t.owner_name,
+      getTicketAmount(t).toString()
+    ]);
+
+    // Add Sala Ventas to the report
+    salaVentas.forEach(v => {
+      rows.push([
+        v.id.substring(0, 8),
+        format(parseISO(v.sold_at), 'yyyy-MM-dd'),
+        "Venta Mostrador",
+        v.items.map(i => `${i.cantidad}x ${i.nombre}`).join('; '),
+        v.total.toString()
+      ]);
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.map(cell => `"${cell.replace(/"/g, '""')}"`).join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `reporte_ventas_${timeRange}_${format(new Date(), 'yyyyMMdd')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -147,37 +290,58 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
             <div className="p-2 bg-zinc-900 text-white rounded-xl shadow-lg ring-4 ring-zinc-900/10">
               <BarChart3 className="w-8 h-8" />
             </div>
-            Inf. de Ventas
-            <span className="text-xs font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200">v4.0</span>
+            Informe de Ventas
+            <span className="text-xs font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200">v4.2</span>
           </h2>
-          <p className="text-zinc-500 mt-1 font-medium italic">"Lo que no se mide, no se puede mejorar."</p>
+          <p className="text-zinc-500 mt-1 font-medium">Facturación y movimientos por período.</p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="bg-white p-1 rounded-xl border border-zinc-200 shadow-sm flex gap-1">
-            {['7d', '30d', 'all'].map(range => (
+        <div className="flex flex-wrap items-center gap-3">
+          {timeRange === '1d' && (
+             <div className="relative group">
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="bg-white border border-emerald-200 text-emerald-700 text-xs font-bold rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500/20 shadow-sm transition-all pr-10"
+                />
+                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 pointer-events-none" />
+             </div>
+          )}
+          
+          <div className="bg-white border border-zinc-200 p-1 rounded-xl flex items-center gap-1 shadow-sm">
+            {[
+              { id: '1d', label: '1 Día' },
+              { id: '7d', label: '7 Días' },
+              { id: '30d', label: '30 Días' },
+              { id: 'all', label: 'Todo' }
+            ].map((range) => (
               <button
-                key={range}
-                onClick={() => setTimeRange(range)}
+                key={range.id}
+                onClick={() => setTimeRange(range.id as any)}
                 className={cn(
-                  "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
-                  timeRange === range 
-                    ? "bg-zinc-900 text-white shadow-md" 
-                    : "text-zinc-500 hover:bg-zinc-100"
+                  "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                  timeRange === range.id
+                    ? "bg-zinc-900 text-white shadow-md shadow-zinc-200" 
+                    : "text-zinc-400 hover:text-zinc-800 hover:bg-zinc-50"
                 )}
               >
-                {range === '7d' ? '7 Días' : range === '30d' ? '30 Días' : 'Todo'}
+                {range.label}
               </button>
             ))}
           </div>
-          <button className="p-2.5 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 transition-colors shadow-sm text-zinc-600">
-            <Download className="w-5 h-5" />
+          
+          <button 
+            onClick={handleDownload}
+            className="p-2.5 bg-white border border-zinc-200 rounded-xl text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 shadow-sm transition-all group/dl"
+            title="Exportar Reporte"
+          >
+            <Download className="w-4 h-4 group-hover/dl:scale-110 transition-transform" />
           </button>
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <KpiCard 
           title="Ventas Totales"
           value={`$${stats.totalRevenue.toLocaleString()}`}
@@ -191,56 +355,62 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
           value={stats.salesCount}
           trend="+5.2%"
           icon={ShoppingBag}
-          color="blue"
+          color="indigo"
           delay={0.1}
         />
         <KpiCard 
-          title="Ticket Promedio"
-          value={`$${Math.round(stats.avgTicket).toLocaleString()}`}
-          trend="-2.4%"
-          trendDown
-          icon={TrendingUp}
-          color="indigo"
+          title="Efectivo (Caja)"
+          value={`$${stats.cashRevenue.toLocaleString()}`}
+          trend="Disponible"
+          icon={Banknote}
+          color="emerald"
           delay={0.2}
         />
         <KpiCard 
-          title="Ingresos del Día"
-          value={`$${Math.round(stats.todayRevenue).toLocaleString()}`}
-          trend="+18.1%"
-          icon={ArrowUpRight}
-          color="amber"
+          title="Ventas Tarjeta"
+          value={`$${stats.cardRevenue.toLocaleString()}`}
+          trend="Confirmado"
+          icon={CreditCard}
+          color="blue"
           delay={0.3}
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white rounded-3xl border border-zinc-200 shadow-xl overflow-hidden group">
+        {/* Tendencia Periódica - Full Width Row */}
+        <div className="bg-white rounded-3xl border border-zinc-200 shadow-xl overflow-hidden group">
           <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
             <h3 className="font-bold text-zinc-800 flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-emerald-600" />
-              Tendencia Semanal
+              {timeRange === 'all' ? 'Desempeño Anual' : 'Tendencia Periódica'}
             </h3>
-            <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Ingresos por día</span>
+            <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
+              {timeRange === 'all' ? 'Ingresos por mes' : 'Ingresos por día'}
+            </span>
           </div>
           
-          <div className="p-8 h-64 flex items-end justify-between gap-4">
+          <div className="p-8 h-64 flex items-end justify-between gap-2 md:gap-4">
             {chartData.map((day, idx) => (
               <div key={idx} className="flex-1 flex flex-col items-center gap-3 h-full justify-end">
                 <div className="relative w-full group/bar h-full flex items-end">
                   <motion.div
                     initial={{ height: 0 }}
                     animate={{ height: `${day.height}%` }}
-                    transition={{ duration: 1, delay: 0.4 + idx * 0.1, ease: "easeOut" }}
+                    transition={{ duration: 1, delay: 0.1 + idx * 0.05, ease: "easeOut" }}
                     className={cn(
-                      "w-full rounded-t-xl min-h-[4px] relative bg-gradient-to-t transition-all duration-300",
-                      idx === 6 ? "from-emerald-600 to-emerald-400" : "from-zinc-200 to-zinc-100 group-hover/bar:from-emerald-200 group-hover/bar:to-emerald-100"
+                      "w-full rounded-t-lg min-h-[4px] relative bg-gradient-to-t transition-all duration-300",
+                      idx === chartData.length - 1 ? "from-emerald-600 to-emerald-400" : "from-zinc-200 to-zinc-100 group-hover/bar:from-emerald-200 group-hover/bar:to-emerald-100"
                     )}
                   />
-                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap z-10 font-bold pointer-events-none">
-                    ${day.total.toLocaleString()}
+                  <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap z-10 font-bold pointer-events-none flex flex-col items-center shadow-xl">
+                    <span className="text-zinc-400 text-[8px] uppercase">{day.fullDate}</span>
+                    <span>${day.total.toLocaleString()}</span>
+                    <span className="text-[7px] text-zinc-500">{day.count} servicios</span>
                   </div>
                 </div>
-                <span className="text-[10px] font-black uppercase text-zinc-400 tracking-tighter">{day.label}</span>
+                <span className={cn(
+                  "text-[8px] md:text-[10px] font-black uppercase text-zinc-400 tracking-tighter",
+                  timeRange === 'all' ? "rotate-0" : ""
+                )}>{day.label}</span>
               </div>
             ))}
           </div>
@@ -249,51 +419,124 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
              <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 text-xs font-bold text-emerald-600">
                     <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-                    Hoy: ${chartData[6].total.toLocaleString()}
+                    Actual: ${chartData[chartData.length - 1].total.toLocaleString()}
                 </div>
                 <div className="flex items-center gap-2 text-xs font-bold text-zinc-400">
                     <div className="w-3 h-3 rounded-full bg-zinc-300" />
-                    Promedio: ${Math.round(chartData.reduce((a, b) => a + b.total, 0) / 7).toLocaleString()}
+                    Promedio: ${Math.round(chartData.reduce((a, b) => a + b.total, 0) / chartData.length).toLocaleString()}
                 </div>
              </div>
           </div>
         </div>
 
-        <div className="bg-zinc-900 rounded-3xl border border-zinc-800 shadow-2xl p-6 text-zinc-100 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-500/20 transition-colors" />
-          
-          <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
-            <Package className="w-5 h-5 text-emerald-400" />
-            Ventas Recientes
-          </h3>
+        {/* Second Row: Recent Sales and Top Sellers */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Ventas Recientes */}
+          <div className="bg-zinc-900 rounded-3xl border border-zinc-800 shadow-2xl p-6 text-zinc-100 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-500/20 transition-colors" />
+            
+            <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
+              <Package className="w-5 h-5 text-emerald-400" />
+              Ventas en Mesón
+            </h3>
 
-          <div className="space-y-4">
-             {filteredSales.slice(0, 5).map((sale, i) => (
-               <div key={sale.id} className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all cursor-pointer group/item">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center font-bold text-[10px] border border-zinc-700">
-                        {sale.id.slice(0, 2).toUpperCase()}
+               {salaVentas.sort((a, b) => parseISO(b.sold_at).getTime() - parseISO(a.sold_at).getTime()).slice(0, 5).map((sale, i) => {
+                  const firstItem = sale.items[0]?.nombre || 'Venta de mostrador';
+                  const otherItemsCount = sale.items.length - 1;
+                  
+                  return (
+                    <div key={sale.id} className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all cursor-pointer group/item">
+                       <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center font-bold text-[10px] border border-zinc-700">
+                             SV
+                         </div>
+                         <div>
+                             <div className="text-xs font-bold group-hover/item:text-emerald-400 transition-colors truncate w-32">
+                               {firstItem} {otherItemsCount > 0 && `+ ${otherItemsCount} más`}
+                             </div>
+                             <div className="text-[10px] text-zinc-500 font-medium truncate w-32">
+                               {sale.notes || 'Venta rápida'}
+                             </div>
+                         </div>
+                       </div>
+                       <div className="text-right">
+                         <div className="text-xs font-black">${sale.total.toLocaleString()}</div>
+                         <div className="text-[9px] text-zinc-500 uppercase font-bold">
+                           {format(parseISO(sale.sold_at), 'dd MMM')}
+                         </div>
+                       </div>
                     </div>
-                    <div>
-                        <div className="text-xs font-bold group-hover/item:text-emerald-400 transition-colors">{sale.model}</div>
-                        <div className="text-[10px] text-zinc-500 font-medium truncate w-24">{sale.owner_name}</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs font-black">${getTicketAmount(sale).toLocaleString()}</div>
-                    <div className="text-[9px] text-zinc-500 uppercase font-bold">{format(parseISO(sale.close_date || sale.last_status_change || sale.entry_date), 'dd MMM')}</div>
-                  </div>
-               </div>
-             ))}
+                  );
+               })}
 
-             {filteredSales.length === 0 && (
-                <div className="text-center py-12 text-zinc-500 italic text-sm">
-                    No hay ventas registradas.
+               {salaVentas.length === 0 && (
+                  <div className="text-center py-12 text-zinc-500 italic text-sm">
+                      No hay ventas de sala registradas.
+                  </div>
+               )}
+          </div>
+
+          {/* Top Sellers Section */}
+          <div className="bg-white rounded-3xl border border-zinc-200 shadow-xl overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
+              <h3 className="font-bold text-zinc-800 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-indigo-600" />
+                Lo más vendido
+              </h3>
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Top 5</span>
+            </div>
+            
+            <div className="p-6 space-y-8 flex-1 overflow-auto">
+              {/* Services */}
+              <div>
+                <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <Wrench className="w-3 h-3" /> Servicios / M.O.
+                </h4>
+                <div className="space-y-3">
+                  {topSellers.services.map((s, i) => (
+                    <div key={i} className="flex flex-col gap-1">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="truncate w-40 text-zinc-700">{s.name}</span>
+                        <span className="text-zinc-900">${s.total.toLocaleString()}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(s.total / (topSellers.services[0]?.total || 1)) * 100}%` }}
+                          className="h-full bg-indigo-500" 
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-             )}
+              </div>
+
+              {/* Products */}
+              <div>
+                <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <Package className="w-3 h-3" /> Insumos / Repuestos
+                </h4>
+                <div className="space-y-3">
+                  {topSellers.products.map((p, i) => (
+                    <div key={i} className="flex flex-col gap-1">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="truncate w-40 text-zinc-700">{p.name}</span>
+                        <span className="text-zinc-900">${p.total.toLocaleString()}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(p.total / (topSellers.products[0]?.total || 1)) * 100}%` }}
+                          className="h-full bg-emerald-500" 
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
       <div className="bg-white rounded-3xl border border-zinc-200 shadow-xl overflow-hidden">
         <div className="p-6 border-b border-zinc-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -301,7 +544,7 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
                 <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
                     <Filter className="w-4 h-4" />
                 </div>
-                <h3 className="font-bold text-zinc-800">Histórico de Transacciones</h3>
+                <h3 className="font-bold text-zinc-800">Servicios Mecánicos</h3>
             </div>
             <div className="relative w-full md:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />

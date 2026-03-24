@@ -7,11 +7,11 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO, subDays, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Part, SalaVenta, SalaVentaItem, GarageSettings } from '../types';
+import { Part, SalaVenta, SalaVentaItem, GarageSettings, PaymentMethod } from '../types';
 
 interface SalaVentasProps {
   parts: Part[];
-  onAddSalaVenta: (items: SalaVentaItem[], notes?: string) => Promise<void>;
+  onAddSalaVenta: (items: SalaVentaItem[], paymentMethod: PaymentMethod, notes?: string) => Promise<void>;
   fetchSalaVentas: (days?: number) => Promise<SalaVenta[]>;
   salaVentas: SalaVenta[];
   settings: GarageSettings | null;
@@ -29,6 +29,7 @@ export function SalaVentas({ parts, onAddSalaVenta, fetchSalaVentas, salaVentas,
   const [confirming, setConfirming] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d'>('today');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Tarjeta');
 
   useEffect(() => {
     fetchSalaVentas(30);
@@ -82,7 +83,7 @@ export function SalaVentas({ parts, onAddSalaVenta, fetchSalaVentas, salaVentas,
         precio_unitario: c.part.price,
         subtotal: c.part.price * c.cantidad
       }));
-      await onAddSalaVenta(items, notes || undefined);
+      await onAddSalaVenta(items, paymentMethod, notes || undefined);
       setCart([]);
       setNotes('');
       setSuccessMsg(`✅ Venta de $${cartTotal.toLocaleString()} registrada`);
@@ -270,6 +271,25 @@ export function SalaVentas({ parts, onAddSalaVenta, fetchSalaVentas, salaVentas,
               rows={2}
               className="w-full text-sm p-3 bg-white border border-zinc-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
             />
+            
+            <div className="flex flex-col gap-2">
+              <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pl-1">Método de Pago</label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['Efectivo', 'Tarjeta'] as const).map(m => (
+                  <button
+                    key={m}
+                    onClick={() => setPaymentMethod(m)}
+                    className={`py-2 text-xs font-bold rounded-xl border transition-all ${
+                      paymentMethod === m 
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' 
+                        : 'bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300'
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Total</p>
@@ -322,7 +342,12 @@ export function SalaVentas({ parts, onAddSalaVenta, fetchSalaVentas, salaVentas,
                         </div>
                         {v.notes && <p className="text-xs text-zinc-500 italic mt-1 truncate">{v.notes}</p>}
                       </div>
-                      <div className="text-sm font-black text-emerald-400 whitespace-nowrap">${v.total.toLocaleString()}</div>
+                      <div className="text-right flex flex-col items-end">
+                        <div className="text-sm font-black text-emerald-400 whitespace-nowrap">${v.total.toLocaleString()}</div>
+                        <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter mt-1 px-1.5 py-0.5 bg-white/5 rounded-md border border-white/10 italic">
+                          {v.payment_method || '---'}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}

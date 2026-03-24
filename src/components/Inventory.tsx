@@ -255,7 +255,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
     <div className="space-y-6 font-sans pb-10">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-zinc-900">Inventario y Repuestos</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-zinc-900">Inventario</h2>
           <p className="text-zinc-500 mt-1">Gestiona el stock de piezas y servicios.</p>
         </div>
         <button
@@ -285,7 +285,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
           )}
         >
           <Package className="w-4 h-4" />
-          Repuestos
+          Insumos / Stock
           <span className="ml-1 px-1.5 py-0.5 rounded-md bg-zinc-200 text-[10px] text-zinc-600">
             {counts.all}
           </span>
