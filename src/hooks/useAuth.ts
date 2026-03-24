@@ -1,14 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
-
-export interface Profile {
-  id: string;
-  email: string;
-  full_name: string;
-  role: string;
-  company_id: string;
-}
+import { Profile } from '../types';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -49,7 +42,18 @@ export function useAuth() {
         .single();
       
       if (error) throw error;
-      setProfile(data as Profile);
+      
+      const profileData = data as Profile;
+      
+      // Si el usuario está bloqueado, desloguear inmediatamente
+      if (profileData.is_blocked) {
+        await supabase.auth.signOut();
+        setProfile(null);
+        setUser(null);
+        return;
+      }
+
+      setProfile(profileData);
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {

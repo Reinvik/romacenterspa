@@ -151,3 +151,13 @@ export interface SalaVenta {
   sold_at: string; // ISO string
   created_at: string; // ISO string
 }
+
+export interface Profile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  company_id: string;
+  is_blocked: boolean;
+  created_at?: string;
+}

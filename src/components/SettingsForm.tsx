@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GarageSettings } from '../types';
-import { Save, Building2, MapPin, Phone, MessageSquare, Loader2, CheckCircle, Palette, Download, FileSpreadsheet } from 'lucide-react';
+import { Save, Building2, MapPin, Phone, MessageSquare, Loader2, CheckCircle, Palette, Download, FileSpreadsheet, Lock, Eye, EyeOff } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { Ticket, Part } from '../types';
 import { cn } from '../lib/utils';
 
@@ -27,7 +28,18 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
     });
     const [loading, setLoading] = useState(false);
     const [saved, setSaved] = useState(false);
-    const [activeTab, setActiveTab] = useState<'general' | 'design' | 'export'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'design' | 'security' | 'export'>('general');
+    
+    // Password Change State
+    const [passwordData, setPasswordData] = useState({
+        current: '',
+        new: '',
+        confirm: ''
+    });
+    const [passwordLoading, setPasswordLoading] = useState(false);
+    const [passwordSaved, setPasswordSaved] = useState(false);
+    const [passwordError, setPasswordError] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         if (settings) {
@@ -146,6 +158,13 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                         className={cn("flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-sm transition-all", activeTab === 'design' ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300")}
                     >
                         <Palette className="w-4 h-4" /> Diseño
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={() => setActiveTab('security')}
+                        className={cn("flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-sm transition-all", activeTab === 'security' ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300")}
+                    >
+                        <Lock className="w-4 h-4" /> Seguridad
                     </button>
                     <button 
                         type="button"
@@ -380,6 +399,84 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                                Exportar Repuestos (.csv)
                            </button>
                        </div>
+                    </div>
+                </div>
+                ) : activeTab === 'security' ? (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div>
+                        <h3 className="text-lg font-bold text-zinc-900">Seguridad de la Cuenta</h3>
+                        <p className="text-sm text-zinc-500 mt-1">Actualiza tu contraseña para mantener tu cuenta segura.</p>
+                    </div>
+
+                    <div className="space-y-4 max-w-sm">
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-zinc-700">Nueva Contraseña</label>
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    value={passwordData.new}
+                                    onChange={e => setPasswordData({ ...passwordData, new: e.target.value })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-500 transition-all pr-10"
+                                    placeholder="Mínimo 6 caracteres"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                                >
+                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-zinc-700">Confirmar Nueva Contraseña</label>
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                value={passwordData.confirm}
+                                onChange={e => setPasswordData({ ...passwordData, confirm: e.target.value })}
+                                className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-500 transition-all"
+                                placeholder="Repite la contraseña"
+                            />
+                        </div>
+
+                        {passwordError && (
+                            <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-100 italic">
+                                {passwordError}
+                            </p>
+                        )}
+
+                        {passwordSaved && (
+                            <p className="text-sm text-emerald-600 bg-emerald-50 p-3 rounded-lg border border-emerald-100 font-medium">
+                                ¡Contraseña actualizada con éxito!
+                            </p>
+                        )}
+
+                        <button
+                            type="button"
+                            disabled={passwordLoading || !passwordData.new || passwordData.new !== passwordData.confirm || passwordData.new.length < 6}
+                            onClick={async () => {
+                                setPasswordLoading(true);
+                                setPasswordError(null);
+                                setPasswordSaved(false);
+                                try {
+                                    const { error } = await supabase.auth.updateUser({
+                                        password: passwordData.new
+                                    });
+                                    if (error) throw error;
+                                    setPasswordSaved(true);
+                                    setPasswordData({ current: '', new: '', confirm: '' });
+                                } catch (err: any) {
+                                    setPasswordError(err.message || 'Error al actualizar la contraseña');
+                                } finally {
+                                    setPasswordLoading(false);
+                                }
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
+                        >
+                            {passwordLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
+                            Actualizar Contraseña
+                        </button>
                     </div>
                 </div>
                 ) : (
