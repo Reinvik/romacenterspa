@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Layout } from './components/Layout';
 import { format } from 'date-fns';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -21,40 +22,41 @@ import { PublicBookingModal } from './components/PublicBookingModal';
 import { LandingPage } from './components/LandingPage';
 import { Sales } from './components/Sales';
 import { SalaVentas } from './components/SalaVentas';
+import { AIConsultant } from './components/AIConsultant';
 
 type ViewState = 'landing' | 'login' | 'customer' | 'dashboard';
 
 export default function App() {
-  const [view, setView] = useState<ViewState>(() => {
+  const [view, setView] = React.useState<ViewState>(() => {
     const saved = localStorage.getItem('roma_garage_view');
     return (saved as ViewState) || 'landing';
   });
-  const [activeTab, setActiveTab] = useState(() => {
+  const [activeTab, setActiveTab] = React.useState(() => {
     return localStorage.getItem('roma_garage_tab') || 'dashboard';
   });
   
-  useEffect(() => {
+  React.useEffect(() => {
     localStorage.setItem('roma_garage_view', view);
   }, [view]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     localStorage.setItem('roma_garage_tab', activeTab);
   }, [activeTab]);
 
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isAddMechanicModalOpen, setIsAddMechanicModalOpen] = useState(false);
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-  const [publicBranding, setPublicBranding] = useState<any>(null);
-  const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
-  const [searchedPatente, setSearchedPatente] = useState<string | null>(null);
-  const [currentCustomerTicket, setCurrentCustomerTicket] = useState<Ticket | null>(null);
-  const [currentCustomerTickets, setCurrentCustomerTickets] = useState<Ticket[]>([]);
-  const [currentCustomerReminder, setCurrentCustomerReminder] = useState<Reminder | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
+  const [isAddMechanicModalOpen, setIsAddMechanicModalOpen] = React.useState(false);
+  const [isBookingModalOpen, setIsBookingModalOpen] = React.useState(false);
+  const [publicBranding, setPublicBranding] = React.useState<any>(null);
+  const [editingTicket, setEditingTicket] = React.useState<Ticket | null>(null);
+  const [searchedPatente, setSearchedPatente] = React.useState<string | null>(null);
+  const [currentCustomerTicket, setCurrentCustomerTicket] = React.useState<Ticket | null>(null);
+  const [currentCustomerTickets, setCurrentCustomerTickets] = React.useState<Ticket[]>([]);
+  const [currentCustomerReminder, setCurrentCustomerReminder] = React.useState<Reminder | null>(null);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewDate, setViewDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [isMonitorMode, setIsMonitorMode] = useState(false);
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [viewDate, setViewDate] = React.useState(format(new Date(), 'yyyy-MM-dd'));
+  const [isMonitorMode, setIsMonitorMode] = React.useState(false);
 
   const { isSuperAdmin, profile } = useAuth();
 
@@ -76,7 +78,7 @@ export default function App() {
   } = useGarageStore(profile?.company_id);
 
   // Monitor Mode Auto-refresh
-  useEffect(() => {
+  React.useEffect(() => {
     let interval: any;
     if (isMonitorMode && activeTab === 'dashboard') {
       interval = setInterval(() => {
@@ -86,7 +88,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isMonitorMode, activeTab, refreshData]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Detect public branding from URL slug (?t=slug)
     const params = new URLSearchParams(window.location.search);
     const slug = params.get('t') || 'roma-spa';
@@ -288,6 +290,7 @@ export default function App() {
       {activeTab === 'sala_ventas' && (
         <SalaVentas
           parts={parts}
+          tickets={tickets}
           onAddSalaVenta={addSalaVenta}
           fetchSalaVentas={fetchSalaVentas}
           salaVentas={salaVentas}
@@ -358,6 +361,19 @@ export default function App() {
       {activeTab === 'users' && isSuperAdmin && (
         <div className="p-8">
           <UsersAdmin />
+        </div>
+      )}
+
+      {activeTab === 'ai_consultant' && (
+        <div className="h-full">
+          <AIConsultant 
+            tickets={tickets}
+            parts={parts}
+            customers={customers}
+            salaVentas={salaVentas}
+            mechanics={mechanics}
+            settings={settings}
+          />
         </div>
       )}
 

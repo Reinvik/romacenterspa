@@ -7,10 +7,12 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO, subDays, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Part, SalaVenta, SalaVentaItem, GarageSettings, PaymentMethod } from '../types';
+import { Part, SalaVenta, SalaVentaItem, GarageSettings, PaymentMethod, Ticket } from '../types';
+import { cn } from '../lib/utils';
 
 interface SalaVentasProps {
   parts: Part[];
+  tickets: Ticket[];
   onAddSalaVenta: (items: SalaVentaItem[], paymentMethod: PaymentMethod, notes?: string) => Promise<void>;
   fetchSalaVentas: (days?: number) => Promise<SalaVenta[]>;
   salaVentas: SalaVenta[];
@@ -22,7 +24,7 @@ interface CartItem {
   cantidad: number;
 }
 
-export function SalaVentas({ parts, onAddSalaVenta, fetchSalaVentas, salaVentas, settings }: SalaVentasProps) {
+export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, salaVentas, settings }: SalaVentasProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
   const [notes, setNotes] = useState('');
@@ -97,16 +99,52 @@ export function SalaVentas({ parts, onAddSalaVenta, fetchSalaVentas, salaVentas,
   // ─── KPIs & historial por rango ───────────────────────────────────────────
   const filteredHistory = useMemo(() => {
     const now = new Date();
-    return salaVentas.filter(v => {
-      const d = parseISO(v.sold_at);
+    
+    const ventasItems = salaVentas.map(v => ({
+      id: v.id,
+      type: 'venta' as const,
+      date: v.sold_at,
+      total: v.total,
+      payment_method: v.payment_method,
+      notes: v.notes,
+      items: v.items,
+      ticketData: undefined
+    }));
+    
+    const ticketItems = tickets
+      .filter(t => t.status === 'Finalizado' || t.status === 'Entregado')
+      .map(t => ({
+        id: t.id,
+        type: 'ticket' as const,
+        date: t.created_at || t.last_status_change || t.entry_date || new Date().toISOString(),
+        total: t.cost || 0,
+        payment_method: t.payment_method,
+        notes: t.vehicle_notes || t.notes,
+        items: undefined,
+        ticketData: t
+      }));
+      
+    const combined = [...ventasItems, ...ticketItems].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
+    return combined.filter(item => {
+      const d = parseISO(item.date);
       if (timeRange === 'today') return isWithinInterval(d, { start: startOfDay(now), end: endOfDay(now) });
       if (timeRange === '7d') return d >= subDays(now, 7);
       return d >= subDays(now, 30);
     });
-  }, [salaVentas, timeRange]);
+  }, [salaVentas, tickets, timeRange]);
 
-  const totalPeriod = useMemo(() =>
-    filteredHistory.reduce((acc, v) => acc + v.total, 0), [filteredHistory]);
+  const { totalPeriod, cashTotal, cardTotal } = useMemo(() => {
+    return filteredHistory.reduce((acc, item) => {
+      const amount = item.total || 0;
+      acc.totalPeriod += amount;
+      if (item.payment_method === 'Efectivo') acc.cashTotal += amount;
+      else acc.cardTotal += amount;
+      return acc;
+    }, { totalPeriod: 0, cashTotal: 0, cardTotal: 0 });
+  }, [filteredHistory]);
 
   const labelRange = { today: 'Hoy', '7d': '7 días', '30d': '30 días' }[timeRange];
 
@@ -325,27 +363,49 @@ export function SalaVentas({ parts, onAddSalaVenta, fetchSalaVentas, salaVentas,
               </div>
             ) : (
               <div className="divide-y divide-zinc-800">
-                {filteredHistory.map(v => (
-                  <div key={v.id} className="px-6 py-4 hover:bg-white/5 transition-colors">
+                {filteredHistory.map(item => (
+                  <div key={`${item.type}-${item.id}`} className="px-6 py-4 hover:bg-white/5 transition-colors">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
                           <Clock className="w-3 h-3" />
-                          {format(parseISO(v.sold_at), "d MMM · HH:mm", { locale: es })}
+                          {format(parseISO(item.date), "d MMM · HH:mm", { locale: es })}
+                          {item.type === 'venta' ? (
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase ml-2">Mesón</span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase ml-2">Taller</span>
+                          )}
                         </div>
-                        <div className="space-y-0.5">
-                          {v.items.map((item, i) => (
-                            <div key={i} className="text-xs text-zinc-400 truncate">
-                              {item.cantidad}× {item.nombre}
+                        
+                        {item.type === 'venta' ? (
+                          <div className="space-y-0.5">
+                            {item.items?.map((i: any, idx: number) => (
+                              <div key={idx} className="text-xs text-zinc-400 truncate">
+                                {i.cantidad}× {i.nombre}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-0.5">
+                            <div className="text-xs font-medium text-zinc-300 truncate">
+                              [{item.ticketData?.id}] {item.ticketData?.model}
                             </div>
-                          ))}
-                        </div>
-                        {v.notes && <p className="text-xs text-zinc-500 italic mt-1 truncate">{v.notes}</p>}
+                          </div>
+                        )}
+                        
+                        {item.notes && <p className="text-xs text-zinc-500 italic mt-1 truncate">{item.notes}</p>}
                       </div>
                       <div className="text-right flex flex-col items-end">
-                        <div className="text-sm font-black text-emerald-400 whitespace-nowrap">${v.total.toLocaleString()}</div>
-                        <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter mt-1 px-1.5 py-0.5 bg-white/5 rounded-md border border-white/10 italic">
-                          {v.payment_method || '---'}
+                        <div className={`text-sm font-black whitespace-nowrap ${item.type === 'venta' ? 'text-emerald-400' : 'text-blue-400'}`}>
+                          ${item.total.toLocaleString()}
+                        </div>
+                        <div className={cn(
+                          "text-[9px] font-black uppercase tracking-tighter mt-1 px-2 py-0.5 rounded-md border italic",
+                          item.payment_method === 'Efectivo' 
+                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20" 
+                            : "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                        )}>
+                          {item.payment_method || 'Tarjeta'}
                         </div>
                       </div>
                     </div>
@@ -355,10 +415,26 @@ export function SalaVentas({ parts, onAddSalaVenta, fetchSalaVentas, salaVentas,
             )}
           </div>
 
-          <div className="p-6 border-t border-zinc-800 bg-zinc-950/50">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Total {labelRange}</span>
+          <div className="p-6 border-t border-zinc-800 bg-zinc-950/50 space-y-3">
+            <div className="flex items-center justify-between border-b border-zinc-800/50 pb-3">
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Resumen {labelRange}</span>
               <span className="text-xl font-black text-emerald-400">${totalPeriod.toLocaleString()}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight flex items-center gap-1.5 font-mono">
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+                  Efectivo
+                </div>
+                <p className="text-sm font-black text-zinc-200">${cashTotal.toLocaleString()}</p>
+              </div>
+              <div className="space-y-1 text-right">
+                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight flex items-center gap-1.5 justify-end font-mono">
+                  Tarjeta
+                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                </div>
+                <p className="text-sm font-black text-zinc-200">${cardTotal.toLocaleString()}</p>
+              </div>
             </div>
           </div>
         </div>

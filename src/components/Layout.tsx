@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Wrench, Package, Users, Settings, LogOut, Bell, Calendar, Menu, X, BarChart3, Search, CalendarCheck, Plus, RefreshCw, ShoppingCart } from 'lucide-react';
+import { LayoutDashboard, Wrench, Package, Users, Settings, LogOut, Bell, Calendar, Menu, X, BarChart3, Search, CalendarCheck, Plus, RefreshCw, ShoppingCart, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -58,6 +58,7 @@ export function Layout({
     { id: 'customers', label: 'Clientes', icon: Users },
     { id: 'mechanics', label: 'Mecánicos', icon: Wrench },
     { id: 'agenda', label: 'Agenda', icon: Calendar },
+    { id: 'ai_consultant', label: 'Consultor IA', icon: Sparkles },
   ];
 
   if (isSuperAdmin) {

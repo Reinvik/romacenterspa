@@ -78,27 +78,11 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
 
   // 3. KPI Calculations — includes Sala Ventas (counter / POS sales)
   const stats = useMemo(() => {
+    const now = new Date();
     const ticketRevenue = filteredSales.reduce((acc, t) => acc + getTicketAmount(t), 0);
 
-    // Filter sala ventas by the same date range
-    const now = new Date();
-    let startDate: Date | null = null;
-    if (timeRange === '7d') startDate = subDays(now, 7);
-    else if (timeRange === '30d') startDate = subDays(now, 30);
-
-    const filteredSalaVentas = salaVentas.filter(v => {
-      const d = parseISO(v.sold_at);
-      if (timeRange === '1d') {
-        const s = startOfDay(parseISO(selectedDate));
-        const e = endOfDay(parseISO(selectedDate));
-        return isWithinInterval(d, { start: s, end: e });
-      }
-      return !startDate || d >= startDate;
-    });
-    const mesaRevenue = filteredSalaVentas.reduce((acc, v) => acc + v.total, 0);
-
-    const totalRevenue = ticketRevenue + mesaRevenue;
-    const totalCount = filteredSales.length + filteredSalaVentas.length;
+    const totalRevenue = ticketRevenue;
+    const totalCount = filteredSales.length;
     const avgTicket = totalCount > 0 ? totalRevenue / totalCount : 0;
     const todayStart = startOfDay(now);
     const todayEnd = endOfDay(now);
@@ -107,16 +91,10 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
                 t.last_status_change ? parseISO(t.last_status_change) : 
                 t.entry_date ? parseISO(t.entry_date) : null;
       return d && isWithinInterval(d, { start: todayStart, end: todayEnd });
-    }).reduce((acc, t) => acc + getTicketAmount(t), 0) +
-    filteredSalaVentas.filter(v => {
-      const d = parseISO(v.sold_at);
-      return isWithinInterval(d, { start: todayStart, end: todayEnd });
-    }).reduce((acc, v) => acc + v.total, 0);
+    }).reduce((acc, t) => acc + getTicketAmount(t), 0);
 
-    const cashRevenue = filteredSales.filter(t => (t as any).payment_method === 'Efectivo').reduce((acc, t) => acc + getTicketAmount(t), 0) +
-                        filteredSalaVentas.filter(v => (v as any).payment_method === 'Efectivo').reduce((acc, v) => acc + v.total, 0);
-    const cardRevenue = filteredSales.filter(t => (t as any).payment_method === 'Tarjeta').reduce((acc, t) => acc + getTicketAmount(t), 0) +
-                        filteredSalaVentas.filter(v => (v as any).payment_method === 'Tarjeta').reduce((acc, v) => acc + v.total, 0);
+    const cashRevenue = filteredSales.filter(t => (t as any).payment_method === 'Efectivo').reduce((acc, t) => acc + getTicketAmount(t), 0);
+    const cardRevenue = filteredSales.filter(t => (t as any).payment_method !== 'Efectivo').reduce((acc, t) => acc + getTicketAmount(t), 0);
 
     return {
       totalRevenue,
@@ -145,11 +123,7 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
           return closeDate && isWithinInterval(closeDate, { start: mStart, end: mEnd });
         });
 
-        const total = mSales.reduce((acc, t) => acc + getTicketAmount(t), 0)
-              + salaVentas.filter(v => {
-                  const d = parseISO(v.sold_at);
-                  return isWithinInterval(d, { start: mStart, end: mEnd });
-                }).reduce((acc, v) => acc + v.total, 0);
+        const total = mSales.reduce((acc, t) => acc + getTicketAmount(t), 0);
 
         return {
           label: format(month, 'MMM', { locale: es }),
@@ -179,11 +153,7 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
       return {
         label: daysCount > 15 ? format(date, 'd') : format(date, 'EEE', { locale: es }),
         fullDate: format(date, 'dd/MM'),
-        total: daySales.reduce((acc, t) => acc + getTicketAmount(t), 0)
-              + salaVentas.filter(v => {
-                  const d = parseISO(v.sold_at);
-                  return isWithinInterval(d, { start: dayStart, end: dayEnd });
-                }).reduce((acc, v) => acc + v.total, 0),
+        total: daySales.reduce((acc, t) => acc + getTicketAmount(t), 0),
         count: daySales.length
       };
     });
@@ -221,20 +191,8 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
       });
     });
 
-    // From Sala Ventas
-    const now = new Date();
-    let startDate: Date | null = null;
-    if (timeRange === '7d') startDate = subDays(now, 7);
-    else if (timeRange === '30d') startDate = subDays(now, 30);
+    // Removed Sala Ventas from top sellers calculation per user request
 
-    salaVentas.filter(v => !startDate || parseISO(v.sold_at) >= startDate).forEach(v => {
-      v.items.forEach(item => {
-        const map = isLabor(item.nombre) ? servicesMap : productsMap;
-        if (!map[item.nombre]) map[item.nombre] = { qty: 0, total: 0 };
-        map[item.nombre].qty += item.cantidad;
-        map[item.nombre].total += item.subtotal;
-      });
-    });
 
     const sortAndSlice = (map: Record<string, any>) => 
       Object.entries(map)
@@ -249,25 +207,18 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
   }, [filteredSales, salaVentas, timeRange]);
 
   const handleDownload = () => {
-    const headers = ["ID", "Fecha", "Tipo", "Descripción/Cliente", "Monto"];
+    const headers = ["ID", "Fecha", "Tipo", "Descripción/Cliente", "Monto", "Pago"];
     const rows = filteredSales.map(t => [
       t.id,
       format(parseISO(t.close_date || t.last_status_change || t.entry_date), 'yyyy-MM-dd'),
       "Servicio",
       t.owner_name,
-      getTicketAmount(t).toString()
+      getTicketAmount(t).toString(),
+      t.payment_method || 'Tarjeta'
     ]);
 
-    // Add Sala Ventas to the report
-    salaVentas.forEach(v => {
-      rows.push([
-        v.id.substring(0, 8),
-        format(parseISO(v.sold_at), 'yyyy-MM-dd'),
-        "Venta Mostrador",
-        v.items.map(i => `${i.cantidad}x ${i.nombre}`).join('; '),
-        v.total.toString()
-      ]);
-    });
+    // Removed Sala Ventas from CSV download per user request
+
 
     const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.map(cell => `"${cell.replace(/"/g, '""')}"`).join(","))].join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -429,110 +380,68 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
           </div>
         </div>
 
-        {/* Second Row: Recent Sales and Top Sellers */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Ventas Recientes */}
-          <div className="bg-zinc-900 rounded-3xl border border-zinc-800 shadow-2xl p-6 text-zinc-100 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-500/20 transition-colors" />
-            
-            <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
-              <Package className="w-5 h-5 text-emerald-400" />
-              Ventas en Mesón
+        {/* Second Row: Top Sellers (Side by Side) */}
+        <div className="bg-white rounded-3xl border border-zinc-200 shadow-xl overflow-hidden flex flex-col mb-8">
+          <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
+            <h3 className="font-bold text-zinc-800 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-indigo-600" />
+              Lo más vendido
             </h3>
-
-               {salaVentas.sort((a, b) => parseISO(b.sold_at).getTime() - parseISO(a.sold_at).getTime()).slice(0, 5).map((sale, i) => {
-                  const firstItem = sale.items[0]?.nombre || 'Venta de mostrador';
-                  const otherItemsCount = sale.items.length - 1;
-                  
-                  return (
-                    <div key={sale.id} className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all cursor-pointer group/item">
-                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center font-bold text-[10px] border border-zinc-700">
-                             SV
-                         </div>
-                         <div>
-                             <div className="text-xs font-bold group-hover/item:text-emerald-400 transition-colors truncate w-32">
-                               {firstItem} {otherItemsCount > 0 && `+ ${otherItemsCount} más`}
-                             </div>
-                             <div className="text-[10px] text-zinc-500 font-medium truncate w-32">
-                               {sale.notes || 'Venta rápida'}
-                             </div>
-                         </div>
-                       </div>
-                       <div className="text-right">
-                         <div className="text-xs font-black">${sale.total.toLocaleString()}</div>
-                         <div className="text-[9px] text-zinc-500 uppercase font-bold">
-                           {format(parseISO(sale.sold_at), 'dd MMM')}
-                         </div>
-                       </div>
-                    </div>
-                  );
-               })}
-
-               {salaVentas.length === 0 && (
-                  <div className="text-center py-12 text-zinc-500 italic text-sm">
-                      No hay ventas de sala registradas.
-                  </div>
-               )}
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Top 5</span>
           </div>
-
-          {/* Top Sellers Section */}
-          <div className="bg-white rounded-3xl border border-zinc-200 shadow-xl overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
-              <h3 className="font-bold text-zinc-800 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-indigo-600" />
-                Lo más vendido
-              </h3>
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Top 5</span>
-            </div>
-            
-            <div className="p-6 space-y-8 flex-1 overflow-auto">
-              {/* Services */}
-              <div>
-                <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <Wrench className="w-3 h-3" /> Servicios / M.O.
-                </h4>
-                <div className="space-y-3">
-                  {topSellers.services.map((s, i) => (
-                    <div key={i} className="flex flex-col gap-1">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="truncate w-40 text-zinc-700">{s.name}</span>
-                        <span className="text-zinc-900">${s.total.toLocaleString()}</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${(s.total / (topSellers.services[0]?.total || 1)) * 100}%` }}
-                          className="h-full bg-indigo-500" 
-                        />
-                      </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 p-8">
+            {/* Products (Left) */}
+            <div>
+              <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                <Package className="w-4 h-4" /> Insumos / Repuestos
+              </h4>
+              <div className="space-y-5">
+                {topSellers.products.map((p, i) => (
+                  <div key={i} className="flex flex-col gap-2">
+                    <div className="flex justify-between text-sm font-bold">
+                      <span className="truncate pr-4 text-zinc-700">{p.name}</span>
+                      <span className="text-zinc-900 whitespace-nowrap">${p.total.toLocaleString()}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(p.total / (topSellers.products[0]?.total || 1)) * 100}%` }}
+                        className="h-full bg-emerald-500" 
+                      />
+                    </div>
+                  </div>
+                ))}
+                {topSellers.products.length === 0 && (
+                  <div className="text-zinc-400 text-sm italic">Sin datos registrados en el periodo.</div>
+                )}
               </div>
+            </div>
 
-              {/* Products */}
-              <div>
-                <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <Package className="w-3 h-3" /> Insumos / Repuestos
-                </h4>
-                <div className="space-y-3">
-                  {topSellers.products.map((p, i) => (
-                    <div key={i} className="flex flex-col gap-1">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="truncate w-40 text-zinc-700">{p.name}</span>
-                        <span className="text-zinc-900">${p.total.toLocaleString()}</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${(p.total / (topSellers.products[0]?.total || 1)) * 100}%` }}
-                          className="h-full bg-emerald-500" 
-                        />
-                      </div>
+            {/* Services (Right) */}
+            <div>
+              <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                <Wrench className="w-4 h-4" /> Servicios / M.O.
+              </h4>
+              <div className="space-y-5">
+                {topSellers.services.map((s, i) => (
+                  <div key={i} className="flex flex-col gap-2">
+                    <div className="flex justify-between text-sm font-bold">
+                      <span className="truncate pr-4 text-zinc-700">{s.name}</span>
+                      <span className="text-zinc-900 whitespace-nowrap">${s.total.toLocaleString()}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(s.total / (topSellers.services[0]?.total || 1)) * 100}%` }}
+                        className="h-full bg-indigo-500" 
+                      />
+                    </div>
+                  </div>
+                ))}
+                {topSellers.services.length === 0 && (
+                  <div className="text-zinc-400 text-sm italic">Sin datos registrados en el periodo.</div>
+                )}
               </div>
             </div>
           </div>
@@ -566,6 +475,7 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
                         <th className="px-6 py-4 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Cliente</th>
                         <th className="px-6 py-4 text-[10px] font-black text-zinc-400 uppercase tracking-widest">Fecha</th>
                         <th className="px-6 py-4 text-[10px] font-black text-zinc-400 uppercase tracking-widest text-right">Monto</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-zinc-400 uppercase tracking-widest text-center">Pago</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
@@ -584,9 +494,19 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
                                     {format(parseISO(sale.close_date || sale.last_status_change || sale.entry_date), "d 'de' MMM, yyyy", { locale: es })}
                                 </div>
                             </td>
-                            <td className="px-6 py-4 text-right">
-                                <div className="text-sm font-black text-zinc-900">${getTicketAmount(sale).toLocaleString()}</div>
-                            </td>
+                             <td className="px-6 py-4 text-right">
+                                 <div className="text-sm font-black text-zinc-900">${getTicketAmount(sale).toLocaleString()}</div>
+                             </td>
+                             <td className="px-6 py-4 text-center">
+                                    <span className={cn(
+                                        "text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-md border italic",
+                                        sale.payment_method === 'Efectivo' 
+                                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20" 
+                                            : "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                                    )}>
+                                        {sale.payment_method || 'Tarjeta'}
+                                    </span>
+                             </td>
                         </tr>
                     ))}
                 </tbody>

@@ -663,15 +663,48 @@ export function useGarageStore(companyId?: string) {
 
   const uploadTicketPhoto = useCallback(async (patente: string, file: File): Promise<string> => {
     try {
-      const fileExt = file.name.split('.').pop();
+      // 1. Optimización del lado del cliente (Compresión)
+      const compressedBlob = await new Promise<Blob>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+          const img = new Image();
+          img.src = e.target?.result as string;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1200;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > MAX_WIDTH) {
+              height = (MAX_WIDTH / width) * height;
+              width = MAX_WIDTH;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            
+            canvas.toBlob((blob) => {
+              if (blob) resolve(blob);
+              else reject(new Error('Error al comprimir imagen'));
+            }, 'image/jpeg', 0.7); // Calidad 0.7 para balance óptimo
+          };
+        };
+        reader.onerror = reject;
+      });
+
+      const fileExt = 'jpg'; // Forzamos jpg por la compresión
       const fileName = `${patente}/${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
       const { data, error } = await supabase.storage
         .from('ticket-photos')
-        .upload(filePath, file, {
+        .upload(filePath, compressedBlob, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
+          contentType: 'image/jpeg'
         });
 
       if (error) throw error;

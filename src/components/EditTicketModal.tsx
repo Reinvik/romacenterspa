@@ -26,6 +26,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState<'Tarjeta' | 'Efectivo'>('Tarjeta');
 
     // Search state for spare parts
     const [partSearch, setPartSearch] = useState('');
@@ -54,6 +55,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                 ...savedParts.filter(p => p.part_id).map(p => p.part_id!),
                 ...savedServices.filter(s => s.part_id).map(s => s.part_id!)
             ];
+            setPaymentMethod(ticket.payment_method || 'Tarjeta');
         }
     }, [ticket]);
 
@@ -150,6 +152,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                 job_photos: jobPhotos,
                 services: [],
                 spare_parts: spareParts,
+                payment_method: paymentMethod,
             });
 
             // Deduct stock for newly-added inventory parts (both in parts and services)
@@ -481,12 +484,33 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                         {/* Footer Actions */}
                         <div className="pt-6 border-t border-zinc-100 sticky bottom-0 bg-white pb-6 mt-8 -mx-6 md:-mx-8 px-6 md:px-8 space-y-4 -mb-6 md:-mb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.06)]">
                             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                                <div className="bg-zinc-900 px-6 py-3 rounded-2xl flex items-center gap-6 shadow-xl shadow-zinc-200 relative overflow-hidden group w-full sm:w-auto">
-                                    <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] relative z-10">Inversión Final</span>
-                                    <span className="text-xl font-black text-white relative z-10 tabular-nums">
-                                        ${totalInvestment.toLocaleString('es-CL')}
-                                    </span>
+                                <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                                    <div className="bg-zinc-900 px-6 py-3 rounded-2xl flex items-center gap-6 shadow-xl shadow-zinc-200 relative overflow-hidden group w-full sm:w-auto">
+                                        <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] relative z-10">Total a pagar</span>
+                                        <span className="text-xl font-black text-white relative z-10 tabular-nums">
+                                            ${totalInvestment.toLocaleString('es-CL')}
+                                        </span>
+                                    </div>
+
+                                    {/* Método de Pago Selector */}
+                                    <div className="flex items-center gap-1 p-1 bg-zinc-100 rounded-xl w-full sm:w-auto">
+                                        {(['Tarjeta', 'Efectivo'] as const).map((m) => (
+                                            <button
+                                                key={m}
+                                                type="button"
+                                                onClick={() => setPaymentMethod(m)}
+                                                className={cn(
+                                                    "flex-1 sm:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
+                                                    paymentMethod === m 
+                                                        ? "bg-white text-zinc-900 shadow-sm" 
+                                                        : "text-zinc-400 hover:text-zinc-600"
+                                                )}
+                                            >
+                                                {m}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                                     <button
