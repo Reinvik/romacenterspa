@@ -96,6 +96,16 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
     }
   };
 
+  // ─── Calculador Homologado de Tickets ────────────────────────────────────
+  const getTicketAmount = (t: Ticket): number => {
+    if (t.cost && t.cost > 0) return t.cost;
+    if (t.quotation_total && t.quotation_total > 0) return t.quotation_total;
+    if (t.spare_parts && t.spare_parts.length > 0) {
+      return t.spare_parts.reduce((acc, sp) => acc + (sp.costo || 0) * (sp.cantidad ?? 1), 0);
+    }
+    return 0;
+  };
+
   // ─── KPIs & historial por rango ───────────────────────────────────────────
   const filteredHistory = useMemo(() => {
     const now = new Date();
@@ -116,8 +126,8 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
       .map(t => ({
         id: t.id,
         type: 'ticket' as const,
-        date: t.created_at || t.last_status_change || t.entry_date || new Date().toISOString(),
-        total: t.cost || 0,
+        date: t.close_date || t.last_status_change || t.entry_date || new Date().toISOString(),
+        total: getTicketAmount(t),
         payment_method: t.payment_method,
         notes: t.vehicle_notes || t.notes,
         items: undefined,

@@ -35,9 +35,9 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
     return 0;
   };
 
-  // 1. Filter tickets that are "Finalizado" (Sales)
+  // 1. Filter tickets that are "Finalizado" or "Entregado" (Sales)
   const salesTickets = useMemo(() => {
-    return tickets.filter(t => t.status === 'Finalizado');
+    return tickets.filter(t => t.status === 'Finalizado' || t.status === 'Entregado');
   }, [tickets]);
 
   // 2. Filter by date range
@@ -80,28 +80,50 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
   // 3. KPI Calculations — includes Sala Ventas (counter / POS sales)
   const stats = useMemo(() => {
     const now = new Date();
+    
+    // Revenue from tickets
     const ticketRevenue = filteredSales.reduce((acc, t) => acc + getTicketAmount(t), 0);
 
-    const totalRevenue = ticketRevenue;
-    const totalCount = filteredSales.length;
-    const avgTicket = totalCount > 0 ? totalRevenue / totalCount : 0;
-    const todayStart = startOfDay(now);
-    const todayEnd = endOfDay(now);
-    const todayRevenue = filteredSales.filter(t => {
-      const d = t.close_date ? parseISO(t.close_date) : 
-                t.last_status_change ? parseISO(t.last_status_change) : 
-                t.entry_date ? parseISO(t.entry_date) : null;
-      return d && isWithinInterval(d, { start: todayStart, end: todayEnd });
-    }).reduce((acc, t) => acc + getTicketAmount(t), 0);
+    // Filter Sala Ventas based on date range
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
+    if (timeRange === '1d') {
+      startDate = startOfDay(parseISO(selectedDate));
+      endDate = endOfDay(parseISO(selectedDate));
+    } else if (timeRange === '7d') {
+      startDate = subDays(now, 7);
+    } else if (timeRange === '30d') {
+      startDate = subDays(now, 30);
+    }
 
-    const cashRevenue = filteredSales.filter(t => (t as any).payment_method === 'Efectivo').reduce((acc, t) => acc + getTicketAmount(t), 0);
-    const cardRevenue = filteredSales.filter(t => (t as any).payment_method !== 'Efectivo').reduce((acc, t) => acc + getTicketAmount(t), 0);
+    const filteredSalaVentas = salaVentas.filter(v => {
+      const d = v.sold_at ? parseISO(v.sold_at) : null;
+      if (!d) return false;
+      const isInRange = timeRange === '1d' 
+        ? isWithinInterval(d, { start: startDate!, end: endDate! })
+        : (!startDate || d >= startDate);
+      return isInRange; 
+    });
+
+    const posRevenue = filteredSalaVentas.reduce((acc, v) => acc + (v.total || 0), 0);
+    const totalRevenue = ticketRevenue + posRevenue;
+
+    const totalCount = filteredSales.length + filteredSalaVentas.length;
+    const avgTicket = totalCount > 0 ? totalRevenue / totalCount : 0;
+    
+    // Cash / Card split for Tickets
+    const cashTickets = filteredSales.filter(t => (t as any).payment_method === 'Efectivo').reduce((acc, t) => acc + getTicketAmount(t), 0);
+    const cardTickets = filteredSales.filter(t => (t as any).payment_method !== 'Efectivo').reduce((acc, t) => acc + getTicketAmount(t), 0);
+
+    // Cash / Card split for POS
+    const cashPOS = filteredSalaVentas.filter(v => v.payment_method === 'Efectivo').reduce((acc, v) => acc + (v.total || 0), 0);
+    const cardPOS = filteredSalaVentas.filter(v => v.payment_method !== 'Efectivo').reduce((acc, v) => acc + (v.total || 0), 0);
 
     return {
       totalRevenue,
       salesCount: totalCount,
-      cashRevenue,
-      cardRevenue,
+      cashRevenue: cashTickets + cashPOS,
+      cardRevenue: cardTickets + cardPOS,
       revenueTrend: 12.5,
     };
   }, [filteredSales, salaVentas, timeRange, selectedDate]);
@@ -123,14 +145,20 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
           const closeDate = closeDateStr ? parseISO(closeDateStr) : null;
           return closeDate && isWithinInterval(closeDate, { start: mStart, end: mEnd });
         });
+        
+        const mSalaVentas = salaVentas.filter(v => {
+          const d = v.sold_at ? parseISO(v.sold_at) : null;
+          return d && isWithinInterval(d, { start: mStart, end: mEnd });
+        });
 
-        const total = mSales.reduce((acc, t) => acc + getTicketAmount(t), 0);
+        const total = mSales.reduce((acc, t) => acc + getTicketAmount(t), 0) + 
+                      mSalaVentas.reduce((acc, v) => acc + (v.total || 0), 0);
 
         return {
           label: format(month, 'MMM', { locale: es }),
           fullDate: format(month, 'MMMM yyyy', { locale: es }),
           total,
-          count: mSales.length
+          count: mSales.length + mSalaVentas.length
         };
       });
 
@@ -150,12 +178,20 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
         const closeDate = closeDateStr ? parseISO(closeDateStr) : null;
         return closeDate && isWithinInterval(closeDate, { start: dayStart, end: dayEnd });
       });
+      
+      const daySalaVentas = salaVentas.filter(v => {
+        const d = v.sold_at ? parseISO(v.sold_at) : null;
+        return d && isWithinInterval(d, { start: dayStart, end: dayEnd });
+      });
+
+      const total = daySales.reduce((acc, t) => acc + getTicketAmount(t), 0) +
+                    daySalaVentas.reduce((acc, v) => acc + (v.total || 0), 0);
 
       return {
         label: daysCount > 15 ? format(date, 'd') : format(date, 'EEE', { locale: es }),
         fullDate: format(date, 'dd/MM'),
-        total: daySales.reduce((acc, t) => acc + getTicketAmount(t), 0),
-        count: daySales.length
+        total,
+        count: daySales.length + daySalaVentas.length
       };
     });
 
