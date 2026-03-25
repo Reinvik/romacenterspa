@@ -4,6 +4,7 @@ import { Save, Building2, MapPin, Phone, MessageSquare, Loader2, CheckCircle, Pa
 import { supabase } from '../lib/supabase';
 import { Ticket, Part } from '../types';
 import { cn } from '../lib/utils';
+import * as XLSX from 'xlsx';
 
 interface SettingsFormProps {
     settings: GarageSettings | null;
@@ -73,31 +74,25 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
         }
     };
     
-    const downloadCSV = (data: any[], filename: string) => {
+    const downloadExcel = (data: any[], filename: string) => {
         if (!data || data.length === 0) {
             alert('No hay datos para exportar.');
             return;
         }
 
-        const headers = Object.keys(data[0]);
-        const csvContent = [
-            headers.join(','),
-            ...data.map(row => headers.map(header => {
-                const value = row[header] === null || row[header] === undefined ? '' : row[header];
-                const escaped = ('' + value).replace(/"/g, '""');
-                return `"${escaped}"`;
-            }).join(','))
-        ].join('\n');
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Ajustar anchos de columna
+        const headers = Object.keys(data[0]);
+        const maxWidths = headers.map(h => {
+            const colData = [h, ...data.map(row => (row[h]?.toString() || ""))];
+            return Math.max(...colData.map(val => val.length)) + 2;
+        });
+        worksheet['!cols'] = maxWidths.map(w => ({ wch: w }));
+
+        XLSX.writeFile(workbook, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     const handleExportTickets = () => {
@@ -119,7 +114,7 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
             Notas: t.notes || ''
         }));
 
-        downloadCSV(exportData, 'tickets_roma_center');
+        downloadExcel(exportData, 'tickets_roma_center');
     };
 
     const handleExportParts = () => {
@@ -136,7 +131,7 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
             Precio: p.price
         }));
 
-        downloadCSV(exportData, 'repuestos_roma_center');
+        downloadExcel(exportData, 'repuestos_roma_center');
     };
 
     return (
@@ -357,7 +352,7 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                 </>
                 ) : activeTab === 'export' ? (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                    <p className="text-sm text-zinc-600 mb-6">Exporta tus datos en formato CSV para usarlos en Excel u otras aplicaciones.</p>
+                    <p className="text-sm text-zinc-600 mb-6">Exporta tus datos en formato Excel (.xlsx) para usarlos en aplicaciones de cálculo.</p>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                        <div className="p-6 rounded-2xl border border-zinc-200 bg-zinc-50 space-y-4 hover:shadow-md transition-shadow">
@@ -376,7 +371,7 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-zinc-200 hover:border-blue-400 hover:text-blue-600 text-zinc-700 font-bold rounded-xl transition-all shadow-sm active:scale-95"
                            >
                                <Download className="w-4 h-4" />
-                               Exportar Tickets (.csv)
+                               Exportar Tickets (.xlsx)
                            </button>
                        </div>
 
@@ -396,7 +391,7 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-zinc-200 hover:border-emerald-400 hover:text-emerald-600 text-zinc-700 font-bold rounded-xl transition-all shadow-sm active:scale-95"
                            >
                                <Download className="w-4 h-4" />
-                               Exportar Repuestos (.csv)
+                               Exportar Repuestos (.xlsx)
                            </button>
                        </div>
                     </div>

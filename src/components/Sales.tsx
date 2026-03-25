@@ -10,6 +10,7 @@ import { format, subDays, startOfDay, endOfDay, isWithinInterval, parseISO, each
 import { es } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { Ticket, Part, GarageSettings, SalaVenta } from '../types';
+import * as XLSX from 'xlsx';
 
 interface SalesProps {
   tickets: Ticket[];
@@ -220,16 +221,18 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
     // Removed Sala Ventas from CSV download per user request
 
 
-    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.map(cell => `"${cell.replace(/"/g, '""')}"`).join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `reporte_ventas_${timeRange}_${format(new Date(), 'yyyyMMdd')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Ventas");
+
+    // Ajustar anchos de columna
+    const maxWidths = headers.map((h, i) => {
+      const colData = [h, ...rows.map(r => r[i]?.toString() || "")];
+      return Math.max(...colData.map(val => val.length)) + 2;
+    });
+    worksheet['!cols'] = maxWidths.map(w => ({ wch: w }));
+
+    XLSX.writeFile(workbook, `reporte_ventas_${timeRange}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
   return (
