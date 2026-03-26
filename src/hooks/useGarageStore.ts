@@ -170,12 +170,17 @@ export function useGarageStore(companyId?: string) {
         }
       }
 
-      // 2. Comprobar si el vehículo ya tiene un ticket "vivo" o archivado
-      const { data: existingTicket } = await supabaseGarage.from('garage_tickets')
+      // 2. Comprobar si el vehículo ya tiene un ticket "vivo" (no finalizado ni entregado)
+      // Si el auto ya tiene un ticket activo, avisar o manejarlo. Si está cerrado, crear uno nuevo.
+      const { data: activeTicket } = await supabaseGarage.from('garage_tickets')
         .select('*')
         .eq('company_id', companyId)
-        .eq('id', ticket.id)
+        .eq('patente', ticket.id) // Usar el campo patente para buscar
+        .not('status', 'in', '("Finalizado","Entregado")')
         .maybeSingle();
+
+      const newId = crypto.randomUUID(); // Generar ID único para cada sesión
+      const plate = ticket.id!; // La patente viene en el campo id del formulario
 
       const initialHistory = [{
         status: ticket.status || 'Ingresado',
@@ -183,82 +188,38 @@ export function useGarageStore(companyId?: string) {
         user: 'Sistema / Recepción'
       }];
 
-      if (existingTicket) {
-        // Vehículo reingresado
-        // 1. Archivar la sesión actual en el historial (si tiene contenido relevante)
-        const currentLog = existingTicket.service_log || [];
-        const hasWorkDone = (existingTicket.services && existingTicket.services.length > 0) || existingTicket.notes;
-        
-        let newLog = currentLog;
-        if (hasWorkDone) {
-          const newEntry = {
-            date: existingTicket.close_date || existingTicket.last_status_change || new Date().toISOString(),
-            notes: existingTicket.notes || '',
-            parts: [
-              ...(existingTicket.services || []).map(s => s.descripcion),
-              ...(existingTicket.spare_parts || []).map(p => `Repuesto: ${p.descripcion}`)
-            ],
-            cost: existingTicket.cost || existingTicket.quotation_total || 0,
-            mileage: existingTicket.mileage,
-            job_photos: existingTicket.job_photos || []
-          };
-          // Evitar duplicados si el último log es idéntico en fecha y notas (opcional, pero ayuda)
-          const lastLog = currentLog[currentLog.length - 1];
-          if (!lastLog || lastLog.date !== newEntry.date || lastLog.notes !== newEntry.notes) {
-            newLog = [...currentLog, newEntry];
-          }
-        }
-
-        // 2. Actualizar con datos del nuevo ingreso
-        const { error } = await supabaseGarage.from('garage_tickets')
-          .update({
-             status: ticket.status || 'Ingresado',
-             mechanic: ticket.mechanic_id === 'Sin asignar' ? null : ticket.mechanic_id,
-             owner_name: ticket.owner_name,
-             owner_phone: ticket.owner_phone,
-             notes: ticket.notes,
-             parts_needed: ticket.parts_needed || [],
-             entry_date: new Date().toISOString(),
-             last_status_change: new Date().toISOString(),
-             close_date: null,
-             quotation_total: 0,
-             quotation_accepted: false,
-             vin: ticket.vin || existingTicket.vin,
-             engine_id: ticket.engine_id || existingTicket.engine_id,
-             mileage: ticket.mileage || existingTicket.mileage,
-             services: ticket.services || [],
-             spare_parts: ticket.spare_parts || [], // Guardar repuestos del nuevo ingreso
-             job_photos: [],  // Resetear fotos para nueva visita
-             service_log: newLog,
-             cost: ticket.cost || 0
-          })
-          .eq('id', ticket.id);
-
-        if (error) throw error;
-      } else {
-        // Vehículo nuevo
-        const { error } = await supabaseGarage.from('garage_tickets').insert([{
-          id: ticket.id,
-          company_id: companyId,
-          model: ticket.model,
-          status: ticket.status || 'Ingresado',
-          mechanic: ticket.mechanic_id === 'Sin asignar' ? null : ticket.mechanic_id,
-          owner_name: ticket.owner_name,
-          owner_phone: ticket.owner_phone,
-          notes: ticket.notes,
-          parts_needed: ticket.parts_needed || [],
-          entry_date: new Date().toISOString(),
-          last_status_change: new Date().toISOString(),
-          vin: ticket.vin,
-          engine_id: ticket.engine_id,
-          mileage: ticket.mileage,
-          services: ticket.services || [],
-          spare_parts: ticket.spare_parts || [],
-          cost: ticket.cost || 0
-        }]);
-
-        if (error) throw error;
+      if (activeTicket) {
+        // Vehículo ya tiene un ticket activo: O lo actualizamos o creamos uno paralelo (decidimos actualizar el activo por seguridad de procesos)
+        // Pero si el usuario quiere "más de un ticket", dejamos que cree uno nuevo con ID distinto.
+        // Si el ticket anterior NO está en estados finales, lo consideramos el mismo.
+        // Pero el requerimiento dice: "se puedan crear mas de un ticket por el mismo auto el mismo dia".
+        // Entonces, creamos uno NUEVO si no hay colisión de ID (que no la hay por ser UUID).
       }
+
+      // Siempre insertamos un nuevo registro para permitir múltiples tickets
+      const { error } = await supabaseGarage.from('garage_tickets').insert([{
+        id: newId,
+        patente: plate,
+        company_id: companyId,
+        model: ticket.model,
+        status: ticket.status || 'Ingresado',
+        mechanic: ticket.mechanic_id === 'Sin asignar' ? null : ticket.mechanic_id,
+        owner_name: ticket.owner_name,
+        owner_phone: ticket.owner_phone,
+        notes: ticket.notes,
+        parts_needed: ticket.parts_needed || [],
+        entry_date: new Date().toISOString(),
+        last_status_change: new Date().toISOString(),
+        vin: ticket.vin,
+        engine_id: ticket.engine_id,
+        mileage: ticket.mileage,
+        services: ticket.services || [],
+        spare_parts: ticket.spare_parts || [],
+        cost: ticket.cost || 0,
+        status_history: initialHistory
+      }]);
+
+      if (error) throw error;
       await fetchData();
     } catch (error) {
       console.error('Error adding ticket:', error);
@@ -305,7 +266,7 @@ export function useGarageStore(companyId?: string) {
         .update({
           status,
           last_status_change: now,
-          close_date: status === 'Finalizado' ? now : null,
+          close_date: (status === 'Finalizado' || status === 'Entregado') ? originalTicket?.entry_date || now : null,
           payment_method: paymentMethod
         })
         .eq('id', ticketId);
@@ -578,7 +539,7 @@ export function useGarageStore(companyId?: string) {
         .from('garage_tickets')
         .select('*')
         .eq('company_id', companyId)
-        .eq('id', normalizedInput)
+        .or(`id.eq.${normalizedInput},patente.eq.${normalizedInput}`)
         .maybeSingle();
       
       if (error) throw error;

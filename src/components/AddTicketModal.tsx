@@ -225,6 +225,7 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     // Preparar el ticket para enviar
     const ticketToSubmit = {
       ...formData,
+      patente: formData.id, // Guardar la placa en el campo patente
       total_estimated_cost: totalEstimatedCost,
       cost: totalEstimatedCost,
       spare_parts: formData.spare_parts // Asegurar que pasamos spare_parts

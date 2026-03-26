@@ -97,7 +97,7 @@ export function KanbanBoard({
     const matchesSearch = t.owner_name.toLowerCase().includes(searchLower) ||
                         t.owner_phone.includes(searchTerm) ||
                         t.model.toLowerCase().includes(searchLower) ||
-                        t.id.toLowerCase().includes(searchLower);
+                        (t.patente || t.id).toLowerCase().includes(searchLower);
     
     if (!matchesSearch) return false;
 
@@ -560,7 +560,7 @@ export function KanbanBoard({
       <ConfirmModal
         isOpen={!!deleteConfirmTicket}
         title="Eliminar Ticket"
-        message={`¿Estás seguro que deseas eliminar el ticket ${deleteConfirmTicket?.id} (${deleteConfirmTicket?.model})? Esta acción es permanente y solo debe usarse para tickets mal creados.`}
+        message={`¿Estás seguro que deseas eliminar el ticket ${deleteConfirmTicket?.patente || deleteConfirmTicket?.id} (${deleteConfirmTicket?.model})? Esta acción es permanente y solo debe usarse para tickets mal creados.`}
         onConfirm={async () => {
           if (deleteConfirmTicket && onDeleteTicket) {
             setIsDeleting(true);

@@ -92,7 +92,7 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
             </div>
             <div className="px-1.5 py-0 flex items-center gap-1.5">
               <span className="text-[10px] sm:text-xs font-mono font-black text-zinc-900 tracking-wider uppercase">
-                {ticket.id}
+                {ticket.patente || ticket.id}
               </span>
             </div>
           </button>

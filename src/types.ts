@@ -34,7 +34,8 @@ export interface ServiceItem {
 }
 
 export interface Ticket {
-  id: string; // Patente
+  id: string; // ID único (UUID o Patente Histórica)
+  patente: string; // Placa del vehículo
   model: string;
   status: TicketStatus;
   mechanic_id: string | null;
