@@ -59,13 +59,13 @@ export function useGarageStore(companyId?: string) {
         remindersData,
         { data: notificationsData }
       ] = await Promise.all([
-        fetchAll('garage_tickets', 'entry_date', false),
-        supabaseGarage.from('garage_mechanics').select('*').eq('company_id', companyId).order('name', { ascending: true }).then(r => r.data),
-        fetchAll('garage_parts', 'name', true),
-        fetchAll('garage_customers', 'name', true),
-        supabaseGarage.from('garage_settings').select('*').eq('company_id', companyId).maybeSingle(),
-        supabaseGarage.from('garage_reminders').select('*').eq('company_id', companyId).order('planned_date', { ascending: true }).then(r => r.data),
-        supabaseGarage.from('garage_notifications').select('*').eq('company_id', companyId).order('created_at', { ascending: false }).limit(20)
+        fetchAll('romaspa_tickets', 'entry_date', false),
+        supabaseGarage.from('romaspa_mechanics').select('*').eq('company_id', companyId).order('name', { ascending: true }).then(r => r.data),
+        fetchAll('romaspa_parts', 'name', true),
+        fetchAll('romaspa_customers', 'name', true),
+        supabaseGarage.from('romaspa_settings').select('*').eq('company_id', companyId).maybeSingle(),
+        supabaseGarage.from('romaspa_reminders').select('*').eq('company_id', companyId).order('planned_date', { ascending: true }).then(r => r.data),
+        supabaseGarage.from('romaspa_notifications').select('*').eq('company_id', companyId).order('created_at', { ascending: false }).limit(20)
       ]);
 
       // Map mechanic names to tickets if mechanic_id is present and mechanicsData is available
@@ -118,7 +118,7 @@ export function useGarageStore(companyId?: string) {
         const normalizedPhone = ticket.owner_phone.replace(/\D/g, '');
         
         // Primero intentamos buscar por teléfono (identificador más fiable)
-        let { data: existingCustomer } = await supabaseGarage.from('garage_customers')
+        let { data: existingCustomer } = await supabaseGarage.from('romaspa_customers')
           .select('id, vehicles, last_mileage, last_vin, last_engine_id, last_model')
           .eq('company_id', companyId)
           .eq('phone', ticket.owner_phone)
@@ -126,7 +126,7 @@ export function useGarageStore(companyId?: string) {
 
         // Si no lo encuentra por teléfono exacto, intentamos por nombre (menos fiable, limitamos a 1)
         if (!existingCustomer) {
-          const { data: byName } = await supabaseGarage.from('garage_customers')
+          const { data: byName } = await supabaseGarage.from('romaspa_customers')
             .select('id, vehicles, last_mileage, last_vin, last_engine_id, last_model')
             .eq('company_id', companyId)
             .eq('name', ticket.owner_name)
@@ -150,13 +150,13 @@ export function useGarageStore(companyId?: string) {
             updates.vehicles = [...vehicles, ticket.id];
           }
 
-          await supabaseGarage.from('garage_customers')
+          await supabaseGarage.from('romaspa_customers')
             .update(updates)
             .eq('company_id', companyId)
             .eq('id', existingCustomer.id);
         } else {
           // Crear nuevo cliente con datos iniciales
-          await supabaseGarage.from('garage_customers').insert([{
+          await supabaseGarage.from('romaspa_customers').insert([{
             company_id: companyId,
             name: ticket.owner_name,
             phone: ticket.owner_phone,
@@ -172,7 +172,7 @@ export function useGarageStore(companyId?: string) {
 
       // 2. Comprobar si el vehículo ya tiene un ticket "vivo" (no finalizado ni entregado)
       // Si el auto ya tiene un ticket activo, avisar o manejarlo. Si está cerrado, crear uno nuevo.
-      const { data: activeTicket } = await supabaseGarage.from('garage_tickets')
+      const { data: activeTicket } = await supabaseGarage.from('romaspa_tickets')
         .select('*')
         .eq('company_id', companyId)
         .eq('patente', ticket.id) // Usar el campo patente para buscar
@@ -197,7 +197,7 @@ export function useGarageStore(companyId?: string) {
       }
 
       // Siempre insertamos un nuevo registro para permitir múltiples tickets
-      const { error } = await supabaseGarage.from('garage_tickets').insert([{
+      const { error } = await supabaseGarage.from('romaspa_tickets').insert([{
         id: newId,
         patente: plate,
         company_id: companyId,
@@ -231,7 +231,7 @@ export function useGarageStore(companyId?: string) {
     if (!companyId) return;
     try {
       const { error } = await supabaseGarage
-        .from('garage_tickets')
+        .from('romaspa_tickets')
         .delete()
         .eq('id', id)
         .eq('company_id', companyId);
@@ -262,7 +262,7 @@ export function useGarageStore(companyId?: string) {
 
     try {
       // 2. Fetch de Fondo a Supabase
-      const { error } = await supabaseGarage.from('garage_tickets')
+      const { error } = await supabaseGarage.from('romaspa_tickets')
         .update({
           status,
           last_status_change: now,
@@ -288,7 +288,7 @@ export function useGarageStore(companyId?: string) {
 
   const addMechanic = useCallback(async (name: string) => {
     try {
-      const { error } = await supabaseGarage.from('garage_mechanics').insert([{ 
+      const { error } = await supabaseGarage.from('romaspa_mechanics').insert([{ 
         name,
         company_id: companyId 
       }]);
@@ -302,7 +302,7 @@ export function useGarageStore(companyId?: string) {
 
   const deleteMechanic = useCallback(async (id: string) => {
     try {
-      const { error } = await supabaseGarage.from('garage_mechanics').delete().eq('id', id);
+      const { error } = await supabaseGarage.from('romaspa_mechanics').delete().eq('id', id);
       if (error) throw error;
       await fetchData();
     } catch (error) {
@@ -312,7 +312,7 @@ export function useGarageStore(companyId?: string) {
 
   const addPart = useCallback(async (part: Partial<Part>) => {
     try {
-      const { error } = await supabaseGarage.from('garage_parts').insert([{
+      const { error } = await supabaseGarage.from('romaspa_parts').insert([{
         id: part.id,
         company_id: companyId,
         name: part.name,
@@ -330,7 +330,7 @@ export function useGarageStore(companyId?: string) {
 
   const addCustomer = useCallback(async (customer: Partial<Customer>) => {
     try {
-      const { error } = await supabaseGarage.from('garage_customers').insert([{
+      const { error } = await supabaseGarage.from('romaspa_customers').insert([{
         company_id: companyId,
         name: customer.name,
         phone: customer.phone,
@@ -348,7 +348,7 @@ export function useGarageStore(companyId?: string) {
 
   const updateCustomer = useCallback(async (customerId: string, updates: Partial<Customer>) => {
     try {
-      const { error } = await supabaseGarage.from('garage_customers')
+      const { error } = await supabaseGarage.from('romaspa_customers')
         .update({
           name: updates.name,
           phone: updates.phone,
@@ -366,7 +366,7 @@ export function useGarageStore(companyId?: string) {
 
   const deleteCustomer = useCallback(async (id: string) => {
     try {
-      const { error } = await supabaseGarage.from('garage_customers').delete().eq('id', id);
+      const { error } = await supabaseGarage.from('romaspa_customers').delete().eq('id', id);
       if (error) throw error;
       await fetchData();
     } catch (error) {
@@ -380,7 +380,7 @@ export function useGarageStore(companyId?: string) {
       const { company_slug, ...settingsUpdates } = updates;
 
       if (settings?.id) {
-        const { error } = await supabaseGarage.from('garage_settings')
+        const { error } = await supabaseGarage.from('romaspa_settings')
           .update(settingsUpdates)
           .eq('id', settings.id);
         if (error) throw error;
@@ -402,7 +402,7 @@ export function useGarageStore(companyId?: string) {
         const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', session.user.id).single();
         if (!profile?.company_id) throw new Error('Usuario sin empresa asginada');
 
-        const { error } = await supabaseGarage.from('garage_settings').insert([{
+        const { error } = await supabaseGarage.from('romaspa_settings').insert([{
            ...updates,
            company_id: profile.company_id
         }]);
@@ -417,7 +417,7 @@ export function useGarageStore(companyId?: string) {
 
   const deletePart = useCallback(async (id: string) => {
     try {
-      const { error } = await supabaseGarage.from('garage_parts').delete().eq('id', id);
+      const { error } = await supabaseGarage.from('romaspa_parts').delete().eq('id', id);
       if (error) throw error;
       await fetchData();
     } catch (error) {
@@ -431,11 +431,11 @@ export function useGarageStore(companyId?: string) {
       // Si el ID cambió, Supabase no permite actualizar la PK directamente de forma sencilla si hay FKs (aunque aquí no hay FKs estrictas en el schema public, mejor manejarlo como delete/insert para seguridad).
       if (updates.id && updates.id !== partId) {
         // 1. Obtener datos actuales
-        const { data: currentPart } = await supabaseGarage.from('garage_parts').select('*').eq('id', partId).single();
+        const { data: currentPart } = await supabaseGarage.from('romaspa_parts').select('*').eq('id', partId).single();
         if (!currentPart) throw new Error('Repuesto no encontrado');
 
         // 2. Insertar nuevo con el nuevo ID
-        const { error: insError } = await supabaseGarage.from('garage_parts').insert([{
+        const { error: insError } = await supabaseGarage.from('romaspa_parts').insert([{
            ...currentPart,
            ...updates,
            id: updates.id
@@ -443,13 +443,13 @@ export function useGarageStore(companyId?: string) {
         if (insError) throw insError;
 
         // 3. Eliminar el viejo
-        const { error: delError } = await supabaseGarage.from('garage_parts').delete().eq('id', partId);
+        const { error: delError } = await supabaseGarage.from('romaspa_parts').delete().eq('id', partId);
         if (delError) {
             // Si falla el borrado, al menos tenemos el nuevo, pero intentamos limpiar
             console.error('Error deleting old part after ID change:', delError);
         }
       } else {
-        const { error } = await supabaseGarage.from('garage_parts')
+        const { error } = await supabaseGarage.from('romaspa_parts')
           .update(updates)
           .eq('id', partId);
         if (error) throw error;
@@ -488,7 +488,7 @@ export function useGarageStore(companyId?: string) {
         dbUpdates.mechanic = updates.mechanic_id === 'Sin asignar' ? null : updates.mechanic_id;
       }
 
-      const { error } = await supabaseGarage.from('garage_tickets')
+      const { error } = await supabaseGarage.from('romaspa_tickets')
         .update(dbUpdates)
         .eq('id', ticketId);
 
@@ -496,13 +496,13 @@ export function useGarageStore(companyId?: string) {
 
       // 3. Sincronizar datos actualizados del ticket con el cliente
       if (dbUpdates.owner_name && dbUpdates.owner_phone) {
-        const { data: customer } = await supabaseGarage.from('garage_customers')
+        const { data: customer } = await supabaseGarage.from('romaspa_customers')
           .select('id')
           .or(`phone.eq.${dbUpdates.owner_phone},name.eq.${dbUpdates.owner_name}`)
           .maybeSingle();
         
         if (customer) {
-          await supabaseGarage.from('garage_customers')
+          await supabaseGarage.from('romaspa_customers')
             .update({
               last_mileage: dbUpdates.mileage,
               last_vin: dbUpdates.vin,
@@ -536,7 +536,7 @@ export function useGarageStore(companyId?: string) {
     if (!companyId) return null;
     try {
       const { data, error } = await supabaseGarage
-        .from('garage_tickets')
+        .from('romaspa_tickets')
         .select('*')
         .eq('company_id', companyId)
         .or(`id.eq.${normalizedInput},patente.eq.${normalizedInput}`)
@@ -566,7 +566,7 @@ export function useGarageStore(companyId?: string) {
       const nextDayStr = nextDay.toISOString().split('T')[0];
 
       const { data: existing } = await supabaseGarage
-        .from('garage_reminders')
+        .from('romaspa_reminders')
         .select('id')
         .eq('company_id', reminder.company_id)
         .gte('planned_date', reminder.planned_date)
@@ -578,7 +578,7 @@ export function useGarageStore(companyId?: string) {
         throw new Error('Ese horario ya está ocupado.');
       }
 
-      const { error } = await supabaseGarage.from('garage_reminders').insert([{
+      const { error } = await supabaseGarage.from('romaspa_reminders').insert([{
         ...reminder,
         company_id: companyId
       }]);
@@ -592,7 +592,7 @@ export function useGarageStore(companyId?: string) {
 
   const updateReminder = useCallback(async (id: string, updates: Partial<Reminder>) => {
     try {
-      const { error } = await supabaseGarage.from('garage_reminders').update(updates).eq('id', id);
+      const { error } = await supabaseGarage.from('romaspa_reminders').update(updates).eq('id', id);
       if (error) throw error;
       await fetchData();
     } catch (error) {
@@ -603,7 +603,7 @@ export function useGarageStore(companyId?: string) {
 
   const deleteReminder = useCallback(async (id: string) => {
     try {
-      const { error } = await supabaseGarage.from('garage_reminders').delete().eq('id', id);
+      const { error } = await supabaseGarage.from('romaspa_reminders').delete().eq('id', id);
       if (error) throw error;
       await fetchData();
     } catch (error) {
@@ -614,7 +614,7 @@ export function useGarageStore(companyId?: string) {
 
   const markNotificationAsRead = useCallback(async (id: string) => {
     try {
-      const { error } = await supabaseGarage.from('garage_notifications').update({ read: true }).eq('id', id);
+      const { error } = await supabaseGarage.from('romaspa_notifications').update({ read: true }).eq('id', id);
       if (error) throw error;
       await fetchData();
     } catch (error) {
@@ -696,7 +696,7 @@ export function useGarageStore(companyId?: string) {
       // Actualizar todos los tickets de esta patente para mantener consistencia de dueño/modelo? 
       // El usuario quiere "modificar los datos para actualizar", usualmente se refiere a los datos del vehículo/dueño actual.
       // Actualizamos el ticket más reciente que es el que manda en la vista.
-      const { error: tErr } = await supabaseGarage.from('garage_tickets')
+      const { error: tErr } = await supabaseGarage.from('romaspa_tickets')
         .update(dbUpdates)
         .eq('id', patente)
         .eq('company_id', companyId);
@@ -705,13 +705,13 @@ export function useGarageStore(companyId?: string) {
 
       // También actualizar en la tabla de clientes si existe
       if (dbUpdates.owner_name && dbUpdates.owner_phone) {
-        const { data: customer } = await supabaseGarage.from('garage_customers')
+        const { data: customer } = await supabaseGarage.from('romaspa_customers')
           .select('id')
           .or(`phone.eq.${dbUpdates.owner_phone},name.eq.${dbUpdates.owner_name}`)
           .maybeSingle();
         
         if (customer) {
-          await supabaseGarage.from('garage_customers')
+          await supabaseGarage.from('romaspa_customers')
             .update({
               last_model: dbUpdates.model,
               last_visit: new Date().toISOString()
@@ -730,7 +730,7 @@ export function useGarageStore(companyId?: string) {
   const deleteVehicle = useCallback(async (patente: string) => {
     try {
       // Eliminar todos los tickets asociados a esta patente para esta empresa
-      const { error } = await supabaseGarage.from('garage_tickets')
+      const { error } = await supabaseGarage.from('romaspa_tickets')
         .delete()
         .eq('id', patente)
         .eq('company_id', companyId);
@@ -745,7 +745,7 @@ export function useGarageStore(companyId?: string) {
 
   const acceptQuotation = useCallback(async (ticketId: string) => {
     try {
-      const { error } = await supabaseGarage.from('garage_tickets')
+      const { error } = await supabaseGarage.from('romaspa_tickets')
         .update({ 
             quotation_accepted: true,
             status: 'Presupuesto Aceptado',
@@ -765,7 +765,7 @@ export function useGarageStore(companyId?: string) {
     try {
       const cleanInput = patenteOrPhone.replace(/[\s\.\-·]/g, '').toUpperCase();
       const { data, error } = await supabaseGarage
-        .from('garage_tickets')
+        .from('romaspa_tickets')
         .select('*')
         .or(`id.ilike.%${cleanInput}%,owner_phone.ilike.%${cleanInput}%`)
         .order('entry_date', { ascending: false });
@@ -804,7 +804,7 @@ export function useGarageStore(companyId?: string) {
     }
 
     const { data: existing } = await supabaseGarage
-      .from('garage_reminders')
+      .from('romaspa_reminders')
       .select('id')
       .eq('company_id', effectiveCompanyId)
       .gte('planned_date', dateOnly)
@@ -818,7 +818,7 @@ export function useGarageStore(companyId?: string) {
 
     // 1. Create the reminder
     const { data: newReminder, error } = await supabaseGarage
-      .from('garage_reminders')
+      .from('romaspa_reminders')
       .insert([{
           ...reminder,
           company_id: effectiveCompanyId,
@@ -834,7 +834,7 @@ export function useGarageStore(companyId?: string) {
 
     // 2. Create a notification for the garage
     try {
-      await supabaseGarage.from('garage_notifications').insert([{
+      await supabaseGarage.from('romaspa_notifications').insert([{
         company_id: reminder.company_id,
         title: 'Nueva Reserva Web',
         message: `El cliente ${reminder.owner_name} ha reservado para el ${reminder.planned_date} a las ${reminder.planned_time} (Vehículo: ${reminder.vehicle_id})`,
@@ -855,7 +855,7 @@ export function useGarageStore(companyId?: string) {
     try {
         const cleanInput = patenteOrPhone.replace(/[\s\.\-·]/g, '').toUpperCase();
         const { data, error } = await supabaseGarage
-            .from('garage_reminders')
+            .from('romaspa_reminders')
             .select('*')
             .or(`patente.eq.${cleanInput},customer_phone.eq.${cleanInput}`)
             .gte('planned_date', new Date().toISOString().split('T')[0])
@@ -882,7 +882,7 @@ export function useGarageStore(companyId?: string) {
 
     // 2. Obtener los settings de esa empresa
     const { data: settings, error: sError } = await supabaseGarage
-      .from('garage_settings')
+      .from('romaspa_settings')
       .select('*')
       .eq('company_id', company.id)
       .single();
@@ -897,7 +897,7 @@ export function useGarageStore(companyId?: string) {
     const nextDayStr = nextDay.toISOString().split('T')[0];
 
     const { data, error } = await supabaseGarage
-      .from('garage_reminders')
+      .from('romaspa_reminders')
       .select('planned_time')
       .eq('company_id', companyId)
       .gte('planned_date', date)
@@ -919,7 +919,7 @@ export function useGarageStore(companyId?: string) {
     // 1. Buscar en garage_tickets (historial de trabajos) para obtener datos rápidos del vehículo
     try {
       const { data: ticket } = await supabaseGarage
-        .from('garage_tickets')
+        .from('romaspa_tickets')
         .select('*')
         .eq('company_id', company_id)
         .eq('id', normalizedInput)
@@ -934,7 +934,7 @@ export function useGarageStore(companyId?: string) {
     try {
       // Fallback: Buscar en el array de vehículos (columna jsonb o array)
       const { data: customers } = await supabaseGarage
-        .from('garage_customers')
+        .from('romaspa_customers')
         .select('name, phone, last_model, vehicles')
         .eq('company_id', company_id)
         .contains('vehicles' as any, [normalizedInput]);
@@ -951,7 +951,7 @@ export function useGarageStore(companyId?: string) {
           try {
               // Buscamos todos los que coincidan con el patrón, para evitar error de maybeSingle
               const { data: multipleByPhone } = await supabaseGarage
-                  .from('garage_customers')
+                  .from('romaspa_customers')
                   .select('name, phone, last_model, vehicles')
                   .eq('company_id', company_id)
                   .ilike('phone', `%${numericInput}%`);
@@ -982,7 +982,7 @@ export function useGarageStore(companyId?: string) {
 
   const clearFinishedTickets = useCallback(async () => {
     try {
-      const { error } = await supabaseGarage.from('garage_tickets')
+      const { error } = await supabaseGarage.from('romaspa_tickets')
         .update({ status: 'Entregado', close_date: new Date().toISOString() })
         .eq('status', 'Finalizado');
       if (error) throw error;
@@ -995,7 +995,7 @@ export function useGarageStore(companyId?: string) {
 
   const dismissPreventive = useCallback(async (ticketId: string) => {
     try {
-      const { error } = await supabaseGarage.from('garage_tickets')
+      const { error } = await supabaseGarage.from('romaspa_tickets')
         .update({ 
             preventive_dismissed: true, 
             dismissed_at: new Date().toISOString() 
@@ -1015,7 +1015,7 @@ export function useGarageStore(companyId?: string) {
       const since = new Date();
       since.setDate(since.getDate() - days);
       const { data, error } = await supabaseGarage
-        .from('garage_sala_ventas')
+        .from('romaspa_sala_ventas')
         .select('*')
         .eq('company_id', companyId)
         .gte('sold_at', since.toISOString())
@@ -1035,7 +1035,7 @@ export function useGarageStore(companyId?: string) {
     const total = items.reduce((acc, i) => acc + i.subtotal, 0);
     try {
       // 1. Insert the sale
-      const { error } = await supabaseGarage.from('garage_sala_ventas').insert([{
+      const { error } = await supabaseGarage.from('romaspa_sala_ventas').insert([{
         company_id: companyId,
         items,
         total,
@@ -1050,7 +1050,7 @@ export function useGarageStore(companyId?: string) {
         const part = parts.find(p => p.id === item.part_id);
         if (part) {
           const newStock = Math.max(0, part.stock - item.cantidad);
-          await supabaseGarage.from('garage_parts')
+          await supabaseGarage.from('romaspa_parts')
             .update({ stock: newStock })
             .eq('id', item.part_id);
         }

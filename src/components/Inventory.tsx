@@ -45,12 +45,12 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
     if (!settings?.company_id) return;
     try {
       const [{ count: allCount }, { count: laborCount }, { count: alertsCount }] = await Promise.all([
-        supabaseGarage.from('garage_parts').select('*', { count: 'exact', head: true })
+        supabaseGarage.from('romaspa_parts').select('*', { count: 'exact', head: true })
           .eq('company_id', settings.company_id)
           .not('name', 'ilike', '%servicio%')
           .not('name', 'ilike', '%m.o.%')
           .not('name', 'ilike', '%mano de obra%'),
-        supabaseGarage.from('garage_parts').select('*', { count: 'exact', head: true })
+        supabaseGarage.from('romaspa_parts').select('*', { count: 'exact', head: true })
           .eq('company_id', settings.company_id)
           .or('name.ilike.%servicio%,name.ilike.%m.o.%,name.ilike.%mano de obra%'),
         supabaseGarage.from('vw_garage_parts_alerts').select('*', { count: 'exact', head: true })
@@ -81,7 +81,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
       if (tab === 'alerts') {
         query = supabaseGarage.from('vw_garage_parts_alerts').select('*').eq('company_id', settings.company_id);
       } else {
-        query = supabaseGarage.from('garage_parts').select('*').eq('company_id', settings.company_id);
+        query = supabaseGarage.from('romaspa_parts').select('*').eq('company_id', settings.company_id);
         if (tab === 'labor') {
           query = query.or('name.ilike.%servicio%,name.ilike.%m.o.%,name.ilike.%mano de obra%');
         } else {

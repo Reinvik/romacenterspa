@@ -61,7 +61,7 @@ export function Customers({ customers, tickets, settings, onAddCustomer, onUpdat
       const to = from + LIMIT - 1;
 
       let query = supabaseGarage
-        .from('garage_tickets')
+        .from('romaspa_tickets')
         .select('*')
         .eq('company_id', settings.company_id);
 
