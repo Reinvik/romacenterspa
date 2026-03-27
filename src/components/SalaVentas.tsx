@@ -116,7 +116,13 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
   // ─── KPIs & historial por rango ───────────────────────────────────────────
   const filteredHistory = useMemo(() => {
     const now = new Date();
-    
+    const safeParseDate = (dateStr: string | undefined): Date => {
+      if (!dateStr) return new Date();
+      // Handle Postgres format with spaces and standard ISO
+      const d = parseISO(dateStr.replace(' ', 'T'));
+      return isNaN(d.getTime()) ? new Date(dateStr) : d;
+    };
+
     const ventasItems = salaVentas.map(v => ({
       id: v.id,
       type: 'venta' as const,
@@ -148,7 +154,7 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
           effectiveDate = '2025-03-16T12:00:00Z';
         } else if (isNewTicket && effectiveDate < '2026-03-01') {
           // If created now but has old data, show it now
-          effectiveDate = t.created_at;
+          effectiveDate = t.created_at || new Date().toISOString();
         }
 
         return {
@@ -167,14 +173,19 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 
+    const startOfToday = startOfDay(now);
+    
     return combined.filter(item => {
-      const d = parseISO(item.date);
-      const dayStr = format(d, 'yyyy-MM-dd');
-      const todayStr = format(now, 'yyyy-MM-dd');
-
-      if (timeRange === 'today') return dayStr === todayStr;
-      if (timeRange === '7d') return d >= subDays(now, 7);
-      return d >= subDays(now, 30);
+      const d = safeParseDate(item.date);
+      
+      if (timeRange === 'today') {
+        const dayStr = format(d, 'yyyy-MM-dd');
+        const todayStr = format(now, 'yyyy-MM-dd');
+        return dayStr === todayStr;
+      }
+      
+      const threshold = subDays(now, timeRange === '7d' ? 7 : 30);
+      return d >= threshold;
     });
   }, [salaVentas, tickets, timeRange]);
 

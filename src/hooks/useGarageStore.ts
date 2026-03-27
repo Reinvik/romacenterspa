@@ -916,7 +916,7 @@ export function useGarageStore(companyId?: string) {
     const normalizedInput = identificador.trim().replace(/[-\s\.\-·]/g, '').toUpperCase();
     const numericInput = identificador.replace(/\D/g, '');
 
-    // 1. Buscar en garage_tickets (historial de trabajos) para obtener datos rápidos del vehículo
+    // 1. Buscar en romaspa_tickets (historial de trabajos) para obtener datos rápidos del vehículo
     try {
       const { data: ticket } = await supabaseGarage
         .from('romaspa_tickets')
@@ -929,7 +929,7 @@ export function useGarageStore(companyId?: string) {
       if (ticket) ticketData = ticket;
     } catch (e) {}
 
-    // 2. Buscar en garage_customers (base de datos de clientes)
+    // 2. Buscar en romaspa_customers (base de datos de clientes)
     // Nota: 'last_vehicle_id' no existe en la tabla, usamos 'vehicles'
     try {
       // Fallback: Buscar en el array de vehículos (columna jsonb o array)
@@ -1010,17 +1010,23 @@ export function useGarageStore(companyId?: string) {
   }, [fetchData]);
 
   const fetchSalaVentas = useCallback(async (days: number = 30) => {
-    if (!companyId) return [];
+    if (!companyId) {
+      console.warn('fetchSalaVentas: No companyId found');
+      return [];
+    }
     try {
       const since = new Date();
       since.setDate(since.getDate() - days);
+      
       const { data, error } = await supabaseGarage
         .from('romaspa_sala_ventas')
         .select('*')
         .eq('company_id', companyId)
         .gte('sold_at', since.toISOString())
         .order('sold_at', { ascending: false });
+
       if (error) throw error;
+      
       const result = (data || []) as SalaVenta[];
       setSalaVentas(result);
       return result;
