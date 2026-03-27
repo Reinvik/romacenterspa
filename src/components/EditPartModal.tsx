@@ -15,7 +15,8 @@ export function EditPartModal({ isOpen, onClose, part, onUpdate }: EditPartModal
         name: '',
         stock: 0,
         min_stock: 0,
-        price: 0
+        price: 0,
+        location: ''
     });
     const [loading, setLoading] = useState(false);
 
@@ -26,7 +27,8 @@ export function EditPartModal({ isOpen, onClose, part, onUpdate }: EditPartModal
                 name: part.name,
                 stock: part.stock,
                 min_stock: part.min_stock,
-                price: part.price
+                price: part.price,
+                location: part.location || ''
             });
         }
     }, [part]);
@@ -129,6 +131,20 @@ export function EditPartModal({ isOpen, onClose, part, onUpdate }: EditPartModal
                             className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-zinc-800 font-sans font-bold"
                             value={formData.price}
                             onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) })}
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold text-zinc-700 flex items-center gap-2">
+                            <Hash className="w-4 h-4 text-zinc-400" />
+                            Ubicación (Pasillo/Posición/Nivel)
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="Ej: 010203"
+                            className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-zinc-800 font-sans"
+                            value={formData.location}
+                            onChange={e => setFormData({ ...formData, location: e.target.value.toUpperCase() })}
                         />
                     </div>
 

@@ -102,8 +102,17 @@ export function KanbanBoard({
     if (!matchesSearch) return false;
 
     const getEffectiveDate = (ticket: any) => {
-      if (ticket.close_date) return ticket.close_date.split('T')[0];
+      // PRIORITY: If last_status_change is more recent than close_date,
+      // it means the ticket was worked on recently (e.g., migrated tickets with old close_dates)
+      const closeStr = ticket.close_date?.split('T')[0] || '';
+      const lastChangeStr = ticket.last_status_change?.split('T')[0] || '';
       
+      if (lastChangeStr && closeStr && lastChangeStr > closeStr) {
+        return lastChangeStr;
+      }
+      
+      if (closeStr) return closeStr;
+
       if (ticket.service_log && ticket.service_log.length > 0) {
         const logDates = ticket.service_log
           .map((s: any) => {
@@ -119,16 +128,16 @@ export function KanbanBoard({
       return (ticket.last_status_change || ticket.entry_date || format(new Date(), 'yyyy-MM-dd')).split('T')[0];
     };
 
-    const isFinalized = t.status === 'Finalizado' || t.status === 'Entregado';
+    const isFinished = t.status === 'Finalizado' || t.status === 'Entregado';
     const completionDate = getEffectiveDate(t);
-    const isViewingToday = viewDate === format(new Date(), 'yyyy-MM-dd');
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const isViewingToday = viewDate === todayStr;
 
-    if (isViewingToday) {
-      if (!isFinalized) return true;
-      return completionDate === viewDate;
-    } else {
-      return completionDate === viewDate;
-    }
+    // RULE 1: If viewing "Today", show all "Active" tickets (they represent current load)
+    if (isViewingToday && !isFinished) return true;
+
+    // RULE 2: If viewing a specific date, show tickets that were active OR finished on that day
+    return completionDate === viewDate;
   }).sort((a, b) => {
     const dateA = new Date(a.entry_date).getTime();
     const dateB = new Date(b.entry_date).getTime();
@@ -223,21 +232,34 @@ export function KanbanBoard({
   const renderTicketList = (columnTickets: Ticket[], dropStatus?: string, label?: string) => {
     const groups: Record<string, Ticket[]> = {};
     columnTickets.forEach(t => {
-      let dateStr = '';
-      if (t.status === 'Finalizado' || t.status === 'Entregado') {
-        if (t.close_date) dateStr = t.close_date;
-        else if (t.service_log && t.service_log.length > 0) {
-          const logDates = t.service_log
-            .map(s => s.date?.match(/\d{4}-\d{2}-\d{2}/)?.[0])
-            .filter(Boolean)
-            .sort((a, b) => b!.localeCompare(a!));
-          if (logDates.length > 0) dateStr = logDates[0]!;
-        }
-        if (!dateStr) dateStr = t.last_status_change || t.entry_date;
-      } else {
-        dateStr = t.entry_date;
+      // Use the SAME logic as the filter above to determine the grouping date
+      const closeStr = t.close_date?.split('T')[0] || '';
+      const lastChangeStr = t.last_status_change?.split('T')[0] || '';
+      
+      let dateForGrouping = '';
+      if (lastChangeStr && closeStr && lastChangeStr > closeStr) {
+        dateForGrouping = lastChangeStr;
+      } else if (closeStr) {
+        dateForGrouping = closeStr;
+      } else if (t.service_log && t.service_log.length > 0) {
+        const logDates = t.service_log
+          .map(s => s.date?.match(/\d{4}-\d{2}-\d{2}/)?.[0])
+          .filter(Boolean)
+          .sort((a, b) => b!.localeCompare(a!));
+        if (logDates.length > 0) dateForGrouping = logDates[0]!;
       }
-      const day = (dateStr || '').split('T')[0] || todayStr;
+
+      if (!dateForGrouping) {
+        dateForGrouping = (t.last_status_change || t.entry_date || todayStr).split('T')[0];
+      }
+
+      // Final fallback/force for 2026 tickets with 2025 dates (migration logic)
+      const ticketCreatedStr = t.created_at || '';
+      if (ticketCreatedStr >= '2026-03-01' && dateForGrouping < '2026-03-01') {
+        dateForGrouping = ticketCreatedStr.split('T')[0];
+      }
+
+      const day = dateForGrouping || todayStr;
       if (!groups[day]) groups[day] = [];
       groups[day].push(t);
     });

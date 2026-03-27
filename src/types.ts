@@ -77,6 +77,7 @@ export interface Part {
   stock: number;
   min_stock: number;
   price: number;
+  location?: string;
   assigned_to?: string; // Patente (Ticket ID)
 }
 

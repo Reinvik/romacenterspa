@@ -99,11 +99,18 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
   // ─── Calculador Homologado de Tickets ────────────────────────────────────
   const getTicketAmount = (t: Ticket): number => {
     if (t.cost && t.cost > 0) return t.cost;
-    if (t.quotation_total && t.quotation_total > 0) return t.quotation_total;
-    if (t.spare_parts && t.spare_parts.length > 0) {
-      return t.spare_parts.reduce((acc, sp) => acc + (sp.costo || 0) * (sp.cantidad ?? 1), 0);
+    
+    let total = 0;
+    if (t.services && Array.isArray(t.services)) {
+      total += t.services.reduce((acc, s) => acc + (Number(s.costo) || 0) * (Number(s.cantidad) || 1), 0);
     }
-    return 0;
+    if (t.spare_parts && Array.isArray(t.spare_parts)) {
+      total += t.spare_parts.reduce((acc, sp) => acc + (Number(sp.costo) || 0) * (Number(sp.cantidad) || 1), 0);
+    }
+    
+    if (total === 0 && t.quotation_total) return t.quotation_total;
+    
+    return total;
   };
 
   // ─── KPIs & historial por rango ───────────────────────────────────────────
@@ -123,16 +130,38 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
     
     const ticketItems = tickets
       .filter(t => t.status === 'Finalizado' || t.status === 'Entregado')
-      .map(t => ({
-        id: t.id,
-        type: 'ticket' as const,
-        date: t.close_date || t.last_status_change || t.entry_date || new Date().toISOString(),
-        total: getTicketAmount(t),
-        payment_method: t.payment_method,
-        notes: t.vehicle_notes || t.notes,
-        items: undefined,
-        ticketData: t
-      }));
+      .map(t => {
+        const mValue = (t.mechanic || '').toLowerCase().trim();
+        const isUnowned = !mValue || mValue === 'sin asignar' || mValue === 'unassigned';
+
+        const ticketCreatedStr = t.created_at || '';
+        const isNewTicket = ticketCreatedStr >= '2026-03-01';
+        const isLegacyTicket = !isNewTicket && (t.entry_date || '') < '2026-03-17T00:00:00';
+        const useEntryDate = isUnowned && isLegacyTicket;
+
+        let effectiveDate = t.close_date || t.last_status_change || t.entry_date || t.created_at || new Date().toISOString();
+        if (t.last_status_change && t.close_date && t.last_status_change > t.close_date) {
+          effectiveDate = t.last_status_change;
+        }
+        
+        if (useEntryDate) {
+          effectiveDate = '2025-03-16T12:00:00Z';
+        } else if (isNewTicket && effectiveDate < '2026-03-01') {
+          // If created now but has old data, show it now
+          effectiveDate = t.created_at;
+        }
+
+        return {
+          id: t.id,
+          type: 'ticket' as const,
+          date: effectiveDate,
+          total: getTicketAmount(t),
+          payment_method: t.payment_method,
+          notes: t.vehicle_notes || t.notes,
+          items: undefined,
+          ticketData: t
+        };
+      });
       
     const combined = [...ventasItems, ...ticketItems].sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -140,7 +169,10 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
 
     return combined.filter(item => {
       const d = parseISO(item.date);
-      if (timeRange === 'today') return isWithinInterval(d, { start: startOfDay(now), end: endOfDay(now) });
+      const dayStr = format(d, 'yyyy-MM-dd');
+      const todayStr = format(now, 'yyyy-MM-dd');
+
+      if (timeRange === 'today') return dayStr === todayStr;
       if (timeRange === '7d') return d >= subDays(now, 7);
       return d >= subDays(now, 30);
     });

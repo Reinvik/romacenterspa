@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { GarageSettings } from '../types';
-import { Save, Building2, MapPin, Phone, MessageSquare, Loader2, CheckCircle, Palette, Download, FileSpreadsheet, Lock, Eye, EyeOff } from 'lucide-react';
+import { Save, Building2, MapPin, Phone, MessageSquare, Loader2, CheckCircle, Palette, Download, FileSpreadsheet, Lock, Eye, EyeOff, ScrollText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Ticket, Part } from '../types';
 import { cn } from '../lib/utils';
 import * as XLSX from 'xlsx';
+import { OperationsManual } from './OperationsManual';
 
 interface SettingsFormProps {
     settings: GarageSettings | null;
@@ -29,7 +30,7 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
     });
     const [loading, setLoading] = useState(false);
     const [saved, setSaved] = useState(false);
-    const [activeTab, setActiveTab] = useState<'general' | 'design' | 'security' | 'export'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'design' | 'security' | 'export' | 'manual'>('general');
     
     // Password Change State
     const [passwordData, setPasswordData] = useState({
@@ -141,7 +142,7 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                     Configuración del Taller
                 </h2>
                 <p className="text-zinc-500 text-sm mt-1">Personaliza la información de tu taller y las comunicaciones con los clientes.</p>
-                <div className="flex gap-2 mt-6">
+                <div className="flex gap-2 mt-6 overflow-x-auto pb-2 scrollbar-hide">
                     <button 
                         type="button"
                         onClick={() => setActiveTab('general')}
@@ -167,6 +168,13 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                         className={cn("flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-sm transition-all", activeTab === 'export' ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300")}
                     >
                         <Download className="w-4 h-4" /> Exportar
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={() => setActiveTab('manual')}
+                        className={cn("flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-sm transition-all", activeTab === 'manual' ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300")}
+                    >
+                        <ScrollText className="w-4 h-4" /> Manual
                     </button>
                 </div>
             </div>
@@ -474,6 +482,8 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                         </button>
                     </div>
                 </div>
+                ) : activeTab === 'manual' ? (
+                    <OperationsManual themeColor={formData.theme_menu_highlight} />
                 ) : (
                 <div className="space-y-6">
                      <p className="text-sm text-zinc-600 mb-6">Personaliza los colores de la barra lateral para que coincidan con la identidad corporativa de tu marca.</p>
@@ -548,7 +558,7 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                 </div>
                 )}
 
-                {activeTab !== 'export' && (
+                {activeTab !== 'export' && activeTab !== 'manual' && (
                 <div className="pt-6 flex items-center justify-between border-t border-zinc-100">
                     {saved && (
                         <span className="text-sm font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2" style={{ color: formData.theme_menu_highlight }}>

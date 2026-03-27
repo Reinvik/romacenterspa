@@ -9,17 +9,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format, subDays, startOfDay, endOfDay, isWithinInterval, parseISO, eachMonthOfInterval, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '../lib/utils';
-import { Ticket, Part, GarageSettings, SalaVenta } from '../types';
+import { Ticket, SalaVenta, Part, GarageSettings, Mechanic } from '../types';
 import * as XLSX from 'xlsx';
 
 interface SalesProps {
   tickets: Ticket[];
-  parts: Part[];
-  settings: GarageSettings | null;
-  salaVentas?: SalaVenta[];
+  salaVentas: SalaVenta[];
+  parts?: Part[];
+  settings?: GarageSettings | null;
+  mechanics?: Mechanic[];
 }
 
-export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps) {
+export function Sales({ tickets, salaVentas, parts = [], settings = null, mechanics = [] }: SalesProps) {
   const [timeRange, setTimeRange] = useState<'1d' | '7d' | '30d' | 'all'>('7d');
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,10 +30,15 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
   const getTicketAmount = (t: Ticket): number => {
     if (t.cost && t.cost > 0) return t.cost;
     if (t.quotation_total && t.quotation_total > 0) return t.quotation_total;
+    
+    let total = 0;
     if (t.spare_parts && t.spare_parts.length > 0) {
-      return t.spare_parts.reduce((acc, sp) => acc + (sp.costo || 0) * (sp.cantidad ?? 1), 0);
+      total += t.spare_parts.reduce((acc, sp) => acc + (sp.costo || 0) * (sp.cantidad ?? 1), 0);
     }
-    return 0;
+    if (t.services && t.services.length > 0) {
+      total += t.services.reduce((acc, s) => acc + (s.costo || 0) * (s.cantidad ?? 1), 0);
+    }
+    return total;
   };
 
   // 1. Filter tickets that are "Finalizado" or "Entregado" (Sales)
@@ -55,13 +61,35 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
       startDate = subDays(now, 30);
     }
 
+    const mechanicNames = new Set(mechanics.map(m => m.name.toLowerCase().trim()));
+
     return salesTickets.filter(t => {
-      const closeDateStr = t.close_date || t.last_status_change || t.entry_date;
-      const closeDate = closeDateStr ? parseISO(closeDateStr) : null;
+      const mValue = (t.mechanic || '').toLowerCase().trim();
+      const isUnowned = !mValue || mValue === 'sin asignar' || mValue === 'unassigned';
+      
+      const ticketCreatedStr = t.created_at || '';
+      const isNewTicket = ticketCreatedStr >= '2026-03-01';
+      const isLegacyTicket = !isNewTicket && (t.entry_date || '') < '2026-03-17T00:00:00';
+      const useEntryDate = isUnowned && isLegacyTicket;
+
+      let baseDate = t.close_date || t.last_status_change || t.entry_date || t.created_at;
+      if (t.last_status_change && t.close_date && t.last_status_change > t.close_date) {
+        baseDate = t.last_status_change;
+      }
+      if (isUnowned && isLegacyTicket) {
+        baseDate = t.entry_date;
+      }
+      
+      if (isNewTicket && (!baseDate || baseDate < '2026-03-01')) {
+          baseDate = t.created_at;
+      }
+
+      const closeDate = baseDate ? parseISO(baseDate) : null;
       if (!closeDate) return false;
       
+      const closeDateDay = format(closeDate, 'yyyy-MM-dd');
       const isInRange = timeRange === '1d' 
-        ? isWithinInterval(closeDate, { start: startDate!, end: endDate! })
+        ? closeDateDay === selectedDate
         : (!startDate || closeDate >= startDate);
       
       const matchesSearch = !searchTerm || 
@@ -75,7 +103,7 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
         const dateB = b.close_date ? parseISO(b.close_date).getTime() : 0;
         return dateB - dateA;
     });
-  }, [salesTickets, timeRange, searchTerm]);
+  }, [salesTickets, timeRange, selectedDate, searchTerm, mechanics]);
 
   // 3. KPI Calculations — includes Sala Ventas (counter / POS sales)
   const stats = useMemo(() => {
@@ -99,8 +127,9 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
     const filteredSalaVentas = salaVentas.filter(v => {
       const d = v.sold_at ? parseISO(v.sold_at) : null;
       if (!d) return false;
+      const dayStr = format(d, 'yyyy-MM-dd');
       const isInRange = timeRange === '1d' 
-        ? isWithinInterval(d, { start: startDate!, end: endDate! })
+        ? dayStr === selectedDate
         : (!startDate || d >= startDate);
       return isInRange; 
     });
@@ -126,7 +155,7 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
       cardRevenue: cardTickets + cardPOS,
       revenueTrend: 12.5,
     };
-  }, [filteredSales, salaVentas, timeRange, selectedDate]);
+  }, [filteredSales, salaVentas, timeRange, selectedDate, searchTerm]);
 
   // 4. Data for Chart (Daily or Monthly Sales)
   const chartData = useMemo(() => {
@@ -140,9 +169,28 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
         const mStart = startOfMonth(month);
         const mEnd = endOfMonth(month);
 
+        const mechanicNames = new Set(mechanics.map(m => m.name.toLowerCase().trim()));
+
         const mSales = salesTickets.filter(t => {
-          const closeDateStr = t.close_date || t.last_status_change || t.entry_date;
-          const closeDate = closeDateStr ? parseISO(closeDateStr) : null;
+          const mName = (t.mechanic || '').toLowerCase().trim();
+          const isUnowned = !mName || mName === 'sin asignar' || mName === 'unassigned' || !mechanicNames.has(mName);
+          
+          const ticketCreatedStr = t.created_at || '';
+          const isNewTicket = ticketCreatedStr >= '2026-03-01';
+          const isLegacyTicket = !isNewTicket && (t.entry_date || '') < '2026-03-17T00:00:00';
+
+          let baseDate = t.close_date || t.last_status_change || t.entry_date || t.created_at;
+          if (t.last_status_change && t.close_date && t.last_status_change > t.close_date) {
+            baseDate = t.last_status_change;
+          }
+          if (isUnowned && isLegacyTicket) {
+            baseDate = t.entry_date;
+          }
+          if (isNewTicket && (!baseDate || baseDate < '2026-03-01')) {
+            baseDate = t.created_at;
+          }
+
+          const closeDate = baseDate ? parseISO(baseDate) : null;
           return closeDate && isWithinInterval(closeDate, { start: mStart, end: mEnd });
         });
         
@@ -151,19 +199,27 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
           return d && isWithinInterval(d, { start: mStart, end: mEnd });
         });
 
-        const total = mSales.reduce((acc, t) => acc + getTicketAmount(t), 0) + 
-                      mSalaVentas.reduce((acc, v) => acc + (v.total || 0), 0);
+        const workshopTotal = mSales.reduce((acc, t) => acc + getTicketAmount(t), 0);
+        const posTotal = mSalaVentas.reduce((acc, v) => acc + (v.total || 0), 0);
+        const total = workshopTotal + posTotal;
 
         return {
           label: format(month, 'MMM', { locale: es }),
           fullDate: format(month, 'MMMM yyyy', { locale: es }),
+          workshopTotal,
+          posTotal,
           total,
           count: mSales.length + mSalaVentas.length
         };
       });
 
       const maxVal = Math.max(...data.map(d => d.total), 1);
-      return data.map(d => ({ ...d, height: (d.total / maxVal) * 100 }));
+      return data.map(d => ({ 
+        ...d, 
+        height: (d.total / maxVal) * 100,
+        workshopHeight: (d.workshopTotal / maxVal) * 100,
+        posHeight: (d.posTotal / maxVal) * 100
+      }));
     }
 
     const daysCount = timeRange === '7d' ? 7 : 30;
@@ -173,23 +229,47 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
       const dayStart = startOfDay(date);
       const dayEnd = endOfDay(date);
       
+      const targetDayStr = format(date, 'yyyy-MM-dd');
+      
+      const mechanicNames = new Set(mechanics.map(m => m.name.toLowerCase().trim()));
+
       const daySales = salesTickets.filter(t => {
-        const closeDateStr = t.close_date || t.last_status_change || t.entry_date;
-        const closeDate = closeDateStr ? parseISO(closeDateStr) : null;
-        return closeDate && isWithinInterval(closeDate, { start: dayStart, end: dayEnd });
+        const mName = (t.mechanic || '').toLowerCase().trim();
+        const isUnowned = !mName || mName === 'sin asignar' || mName === 'unassigned' || !mechanicNames.has(mName);
+        
+        const ticketCreatedStr = t.created_at || '';
+        const isNewTicket = ticketCreatedStr >= '2026-03-01';
+        const isLegacyTicket = !isNewTicket && (t.entry_date || '') < '2026-03-17T00:00:00';
+
+        let baseDate = t.close_date || t.last_status_change || t.entry_date || t.created_at;
+        if (t.last_status_change && t.close_date && t.last_status_change > t.close_date) {
+          baseDate = t.last_status_change;
+        }
+        if (isUnowned && isLegacyTicket) {
+          baseDate = t.entry_date;
+        }
+        if (isNewTicket && (!baseDate || baseDate < '2026-03-01')) {
+          baseDate = t.created_at;
+        }
+
+        const closeDate = baseDate ? parseISO(baseDate) : null;
+        return closeDate && format(closeDate, 'yyyy-MM-dd') === targetDayStr;
       });
       
       const daySalaVentas = salaVentas.filter(v => {
         const d = v.sold_at ? parseISO(v.sold_at) : null;
-        return d && isWithinInterval(d, { start: dayStart, end: dayEnd });
+        return d && format(d, 'yyyy-MM-dd') === targetDayStr;
       });
 
-      const total = daySales.reduce((acc, t) => acc + getTicketAmount(t), 0) +
-                    daySalaVentas.reduce((acc, v) => acc + (v.total || 0), 0);
+      const workshopTotal = daySales.reduce((acc, t) => acc + getTicketAmount(t), 0);
+      const posTotal = daySalaVentas.reduce((acc, v) => acc + (v.total || 0), 0);
+      const total = workshopTotal + posTotal;
 
       return {
         label: daysCount > 15 ? format(date, 'd') : format(date, 'EEE', { locale: es }),
         fullDate: format(date, 'dd/MM'),
+        workshopTotal,
+        posTotal,
         total,
         count: daySales.length + daySalaVentas.length
       };
@@ -198,7 +278,9 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
     const maxVal = Math.max(...data.map(d => d.total), 1);
     return data.map(d => ({
       ...d,
-      height: (d.total / maxVal) * 100
+      height: (d.total / maxVal) * 100,
+      workshopHeight: (d.workshopTotal / maxVal) * 100,
+      posHeight: (d.posTotal / maxVal) * 100
     }));
   }, [salesTickets, salaVentas, timeRange]);
 
@@ -245,14 +327,38 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
 
   const handleDownload = () => {
     const headers = ["ID", "Fecha", "Tipo", "Descripción/Cliente", "Monto", "Pago"];
-    const rows = filteredSales.map(t => [
-      t.id,
-      format(parseISO(t.close_date || t.last_status_change || t.entry_date), 'yyyy-MM-dd'),
-      "Servicio",
-      t.owner_name,
-      getTicketAmount(t).toString(),
-      t.payment_method || 'Tarjeta'
-    ]);
+    const mechanicNames = new Set(mechanics.map(m => m.name.toLowerCase().trim()));
+    
+    const rows = filteredSales.map(t => {
+      const mName = (t.mechanic || '').toLowerCase().trim();
+      const isUnowned = !mName || mName === 'sin asignar' || mName === 'unassigned' || !mechanicNames.has(mName);
+      
+      const ticketCreatedStr = t.created_at || '';
+      const isNewTicket = ticketCreatedStr >= '2026-03-01';
+      const isLegacyTicket = !isNewTicket && (t.entry_date || '') < '2026-03-17T00:00:00';
+
+      let baseDate = t.close_date || t.last_status_change || t.entry_date || t.created_at || '';
+      if (t.last_status_change && t.close_date && t.last_status_change > t.close_date) {
+        baseDate = t.last_status_change;
+      }
+      if (isUnowned && isLegacyTicket) {
+        baseDate = t.entry_date;
+      }
+      if (isNewTicket && (!baseDate || baseDate < '2026-03-01')) {
+        baseDate = t.created_at;
+      }
+
+      const dateStr = baseDate;
+      
+      return [
+        t.id,
+        dateStr ? format(parseISO(dateStr), 'yyyy-MM-dd') : 'S/F',
+        "Servicio",
+        t.owner_name,
+        getTicketAmount(t).toString(),
+        t.payment_method || 'Tarjeta'
+      ];
+    });
 
     // Removed Sala Ventas from CSV download per user request
 
@@ -381,20 +487,40 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
           <div className="p-8 h-64 flex items-end justify-between gap-2 md:gap-4">
             {chartData.map((day, idx) => (
               <div key={idx} className="flex-1 flex flex-col items-center gap-3 h-full justify-end">
-                <div className="relative w-full group/bar h-full flex items-end">
+                <div className="relative w-full group/bar h-full flex flex-col justify-end overflow-hidden rounded-t-lg">
                   <motion.div
                     initial={{ height: 0 }}
-                    animate={{ height: `${day.height}%` }}
+                    animate={{ height: `${day.workshopHeight}%` }}
                     transition={{ duration: 1, delay: 0.1 + idx * 0.05, ease: "easeOut" }}
                     className={cn(
-                      "w-full rounded-t-lg min-h-[4px] relative bg-gradient-to-t transition-all duration-300",
-                      idx === chartData.length - 1 ? "from-emerald-600 to-emerald-400" : "from-zinc-200 to-zinc-100 group-hover/bar:from-emerald-200 group-hover/bar:to-emerald-100"
+                      "w-full min-h-[2px] bg-indigo-500 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] transition-all duration-300",
+                      idx === chartData.length - 1 ? "bg-indigo-600" : "opacity-80 group-hover/bar:opacity-100"
                     )}
                   />
-                  <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap z-10 font-bold pointer-events-none flex flex-col items-center shadow-xl">
-                    <span className="text-zinc-400 text-[8px] uppercase">{day.fullDate}</span>
-                    <span>${day.total.toLocaleString()}</span>
-                    <span className="text-[7px] text-zinc-500">{day.count} servicios</span>
+                  <motion.div
+                    initial={{ height: 0 }}
+                    animate={{ height: `${day.posHeight}%` }}
+                    transition={{ duration: 1, delay: 0.1 + idx * 0.05, ease: "easeOut" }}
+                    className={cn(
+                      "w-full min-h-[2px] bg-emerald-500 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] transition-all duration-300",
+                      idx === chartData.length - 1 ? "bg-emerald-600" : "opacity-80 group-hover/bar:opacity-100"
+                    )}
+                  />
+                  
+                  <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[10px] px-3 py-2 rounded-xl opacity-0 group-hover/bar:opacity-100 transition-all scale-75 group-hover/bar:scale-100 whitespace-nowrap z-20 font-bold pointer-events-none flex flex-col gap-1 shadow-2xl ring-1 ring-white/10">
+                    <span className="text-zinc-400 text-[8px] uppercase tracking-wider border-b border-white/10 pb-1 mb-1">{day.fullDate}</span>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-indigo-300">Taller:</span>
+                      <span>${day.workshopTotal.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-emerald-300">Mesón:</span>
+                      <span>${day.posTotal.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 pt-1 mt-1 border-t border-white/10 text-xs">
+                      <span>Total:</span>
+                      <span className="text-white">${day.total.toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
                 <span className={cn(
@@ -530,7 +656,16 @@ export function Sales({ tickets, parts, settings, salaVentas = [] }: SalesProps)
                             <td className="px-6 py-4">
                                 <div className="text-xs text-zinc-500 flex items-center gap-1.5 font-bold">
                                     <Calendar className="w-3.5 h-3.5" />
-                                    {format(parseISO(sale.close_date || sale.last_status_change || sale.entry_date), "d 'de' MMM, yyyy", { locale: es })}
+                                    {(() => {
+                                        const mechanicNames = new Set(mechanics.map(m => m.name.toLowerCase().trim()));
+                                        const mName = (sale.mechanic || '').toLowerCase().trim();
+                                        const isUnowned = !mName || mName === 'sin asignar' || mName === 'unassigned' || !mechanicNames.has(mName);
+                                        const isMigrationDay = sale.close_date?.startsWith('2026-03-16');
+                                        const useEntryDate = isUnowned || isMigrationDay;
+
+                                        const dateStr = (useEntryDate ? sale.entry_date : sale.close_date) || sale.entry_date || sale.close_date || sale.last_status_change;
+                                        return dateStr ? format(parseISO(dateStr), "d 'de' MMM, yyyy", { locale: es }) : 'S/F';
+                                    })()}
                                 </div>
                             </td>
                              <td className="px-6 py-4 text-right">

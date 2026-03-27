@@ -24,8 +24,9 @@ export function Mechanics({ mechanics, tickets, onAdd, onDelete, onUpdateTicket 
             return tickets.filter(t => {
                 // For revenue reporting: use close_date for finished tickets, entry_date otherwise
                 // Avoid using last_status_change as it's updated on every edit
+                const isUnowned = !t.mechanic_id || t.mechanic_id === 'Sin asignar' || t.mechanic === 'Sin asignar';
                 const isClosed = t.status === 'Finalizado' || t.status === 'Entregado';
-                const dateStr = (isClosed && t.close_date) ? t.close_date : t.entry_date;
+                const dateStr = (isClosed && t.close_date && !isUnowned) ? t.close_date : t.entry_date;
                 const d = parseISO(dateStr);
                 if (mode === 'daily') return isSameDay(d, targetDate);
                 if (mode === 'monthly') return d.getMonth() === targetDate.getMonth() && d.getFullYear() === targetDate.getFullYear();
@@ -95,8 +96,9 @@ export function Mechanics({ mechanics, tickets, onAdd, onDelete, onUpdateTicket 
         // Stats specific to the current period filter
         const currentTarget = modeToDate(filterMode, selectedDate, selectedMonth, selectedYear);
         const periodTickets = mechanicTickets.filter(t => {
+            const isUnowned = !t.mechanic_id || t.mechanic_id === 'Sin asignar' || t.mechanic === 'Sin asignar';
             const isClosed = t.status === 'Finalizado' || t.status === 'Entregado';
-            const dateStr = (isClosed && t.close_date) ? t.close_date : t.entry_date;
+            const dateStr = (isClosed && t.close_date && !isUnowned) ? t.close_date : t.entry_date;
             const d = parseISO(dateStr);
             if (filterMode === 'daily') return isSameDay(d, currentTarget);
             if (filterMode === 'monthly') return d.getMonth() === currentTarget.getMonth() && d.getFullYear() === currentTarget.getFullYear();

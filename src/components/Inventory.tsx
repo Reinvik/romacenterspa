@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Part, GarageSettings } from '../types';
-import { Package, AlertTriangle, Plus, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Wrench } from 'lucide-react';
+import { Package, AlertTriangle, Plus, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Wrench, MapPin } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { AddPartModal } from './AddPartModal';
 import { EditPartModal } from './EditPartModal';
@@ -90,7 +90,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
       }
 
       if (term) {
-        query = query.or(`name.ilike.%${term}%,id.ilike.%${term}%`);
+        query = query.or(`name.ilike.%${term}%,id.ilike.%${term}%,location.ilike.%${term}%`);
       }
 
       query = query.order(sort.field, { ascending: sort.direction === 'asc' });
@@ -360,13 +360,14 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                            <tr className="bg-zinc-50/80 border-b border-zinc-200 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
                               <th className="px-6 py-4">ID / Código</th>
                               <th className="px-6 py-4">Nombre</th>
+                              <th className="px-6 py-4 text-center">Ubicación</th>
                               <th className="px-6 py-4 text-right">Stock</th>
                               <th className="px-6 py-4 text-right">Precio Unit.</th>
                               <th className="px-1 py-4 text-center">Acciones</th>
                            </tr>
                         </thead>
                         <tbody>
-                           <tr><td colSpan={5} className="p-0"><TableSkeleton /></td></tr>
+                           <tr><td colSpan={6} className="p-0"><TableSkeleton /></td></tr>
                         </tbody>
                      </table>
                   </div>
@@ -390,7 +391,15 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                              </div>
                              <div>
                                <h4 className="font-bold text-zinc-900 leading-tight">{part.name}</h4>
-                               <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-tighter">ID: {part.id}</span>
+                               <div className="flex items-center gap-2">
+                                 <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-tighter">ID: {part.id}</span>
+                                 {part.location && (
+                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-zinc-100 text-zinc-600 border border-zinc-200 uppercase">
+                                     <MapPin className="w-2.5 h-2.5" />
+                                     {part.location}
+                                   </span>
+                                 )}
+                               </div>
                              </div>
                            </div>
                            <div className="flex gap-2">
@@ -445,6 +454,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                          <th className="px-6 py-4 cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('name')}>
                            <div className="flex items-center">Nombre <SortIcon field="name" /></div>
                          </th>
+                         <th className="px-6 py-4 text-center">Ubicación</th>
                          <th className="px-6 py-4 text-right cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('stock')}>
                            <div className="flex items-center justify-end">Stock <SortIcon field="stock" /></div>
                          </th>
@@ -457,7 +467,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                      <tbody className="divide-y divide-zinc-100">
                        {inventoryParts.length === 0 ? (
                          <tr>
-                           <td colSpan={5} className="px-6 py-12 text-center">
+                           <td colSpan={6} className="px-6 py-12 text-center">
                              <Package className="w-12 h-12 text-zinc-200 mx-auto mb-3" />
                              <p className="text-zinc-500 font-medium">No se encontraron ítems.</p>
                            </td>
@@ -478,6 +488,16 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                                  <span className="font-semibold text-zinc-900">{part.name}</span>
                                </div>
                              </td>
+                             <td className="px-6 py-4">
+                                {part.location ? (
+                                  <div className="flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600 border border-zinc-200">
+                                    <MapPin className="w-3 h-3 text-zinc-400" />
+                                    {part.location}
+                                  </div>
+                                ) : (
+                                  <div className="text-center text-zinc-300 text-[10px] italic">No asignada</div>
+                                )}
+                              </td>
                              <td className="px-6 py-4 text-right">
                                <div className="flex flex-col items-end">
                                  <span className={cn(
@@ -515,7 +535,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                      </tbody>
                    </table>
                  </div>
-
+     
                  {/* Load More Button */}
                  {hasMore && (
                     <div className="p-4 border-t border-zinc-100 bg-zinc-50/30 flex justify-center">
@@ -587,9 +607,17 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                         </span>
                       </div>
                       <h4 className="font-bold text-zinc-900 group-hover:text-amber-700 transition-colors" title={part.name}>{part.name}</h4>
-                      <p className="text-xs text-zinc-500 mt-1 mb-4 flex items-center gap-1.5">
-                        Límite mínimo: <span className="font-bold text-zinc-700">{part.min_stock}</span>
-                      </p>
+                      <div className="flex flex-wrap gap-2 mt-2 mb-4">
+                        <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+                          Límite mínimo: <span className="font-bold text-zinc-700">{part.min_stock}</span>
+                        </p>
+                        {part.location && (
+                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-zinc-50 text-zinc-500 border border-zinc-100 uppercase">
+                            <MapPin className="w-2.5 h-2.5" />
+                            {part.location}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <button
                       onClick={() => {

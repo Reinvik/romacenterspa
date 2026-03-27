@@ -1,14 +1,14 @@
-import * as React from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
 import { Profile } from '../types';
 
 export function useAuth() {
-  const [user, setUser] = React.useState<User | null>(null);
-  const [profile, setProfile] = React.useState<Profile | null>(null);
-  const [loadingAuth, setLoadingAuth] = React.useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Obtener sesión inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
