@@ -66,7 +66,7 @@ export function Customers({ customers, tickets, settings, onAddCustomer, onUpdat
         .eq('company_id', settings.company_id);
 
       if (term) {
-        query = query.or(`id.ilike.%${term}%,owner_name.ilike.%${term}%,owner_phone.ilike.%${term}%`);
+        query = query.or(`patente.ilike.%${term}%,owner_name.ilike.%${term}%,owner_phone.ilike.%${term}%`);
       }
 
       const { data, error } = await query
@@ -170,12 +170,13 @@ export function Customers({ customers, tickets, settings, onAddCustomer, onUpdat
     }>();
 
     crmTickets.forEach(ticket => {
-      const patente = ticket.id;
+      // Usar la columna patente para agrupar, si no existe (fallback) usar ID
+      const patente = ticket.patente || ticket.id;
       const existing = vehicleMap.get(patente);
       
       if (!existing || new Date(ticket.close_date || ticket.entry_date) > new Date(existing.lastVisit)) {
         vehicleMap.set(patente, {
-          id: patente,
+          id: patente, // Usamos la patente como ID para las operaciones de edición/vincular
           ownerName: ticket.owner_name,
           ownerPhone: ticket.owner_phone,
           model: ticket.model,

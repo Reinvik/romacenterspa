@@ -684,21 +684,16 @@ export function useGarageStore(companyId?: string) {
 
   const updateVehicle = useCallback(async (patente: string, updates: { ownerName?: string; ownerPhone?: string; model?: string }) => {
     try {
-      // Encontrar el último ticket de esta patente para obtener su ID real de base de datos
-      const lastTicket = tickets.find(t => t.id === patente);
-      if (!lastTicket) throw new Error('Vehículo no encontrado');
-
+      // No buscamos por id === patente, sino que operamos sobre la patente directamente en la tabla
       const dbUpdates: any = {};
       if (updates.ownerName !== undefined) dbUpdates.owner_name = updates.ownerName;
       if (updates.ownerPhone !== undefined) dbUpdates.owner_phone = updates.ownerPhone;
       if (updates.model !== undefined) dbUpdates.model = updates.model;
 
-      // Actualizar todos los tickets de esta patente para mantener consistencia de dueño/modelo? 
-      // El usuario quiere "modificar los datos para actualizar", usualmente se refiere a los datos del vehículo/dueño actual.
-      // Actualizamos el ticket más reciente que es el que manda en la vista.
+      // Actualizar todos los tickets de esta patente para mantener consistencia de dueño/modelo
       const { error: tErr } = await supabaseGarage.from('romaspa_tickets')
         .update(dbUpdates)
-        .eq('id', patente)
+        .eq('patente', patente)
         .eq('company_id', companyId);
 
       if (tErr) throw tErr;
@@ -732,7 +727,7 @@ export function useGarageStore(companyId?: string) {
       // Eliminar todos los tickets asociados a esta patente para esta empresa
       const { error } = await supabaseGarage.from('romaspa_tickets')
         .delete()
-        .eq('id', patente)
+        .eq('patente', patente)
         .eq('company_id', companyId);
       
       if (error) throw error;

@@ -57,7 +57,7 @@ export function VehicleCRMModal({ isOpen, onClose, ticket, onUpdateNotes, settin
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <h2 className="text-3xl font-black tracking-widest uppercase bg-white text-zinc-900 px-3 py-1 rounded-lg">
-                  {ticket.id}
+                  {ticket.patente || ticket.id}
                 </h2>
               </div>
               <p className="text-zinc-400 font-medium text-lg">{ticket.model}</p>

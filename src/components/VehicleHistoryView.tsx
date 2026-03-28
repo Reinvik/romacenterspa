@@ -75,7 +75,7 @@ export function VehicleHistoryView({ ticket, settings }: VehicleHistoryViewProps
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-lg font-black tracking-wider uppercase">{ticket.id}</span>
+              <span className="text-lg font-black tracking-wider uppercase">{ticket.patente || ticket.id}</span>
               <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold border" style={{ backgroundColor: primaryBg, color: primaryColor, borderColor: `${primaryColor}30` }}>
                 {totalVisits} {totalVisits === 1 ? 'VISITA' : 'VISITAS'}
               </span>
