@@ -138,15 +138,32 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
   }
   const primaryBg = primaryColor.startsWith('#') && primaryColor.length === 7 ? `${primaryColor}15` : 'rgba(16, 185, 129, 0.1)';
 
-  const statusOrder: TicketStatus[] = [
+  const displaySteps = [
     'Ingresado',
-    'En Espera',
-    'En Mantención',
-    'Elevador 1',
-    'Elevador 2',
+    'Mantención',
     'Listo para Entrega',
     'Finalizado'
   ];
+
+  const getStepIndex = (status: TicketStatus) => {
+    switch (status) {
+      case 'Ingresado':
+      case 'En Espera':
+        return 0;
+      case 'En Mantención':
+      case 'En Reparación':
+      case 'Elevador 1':
+      case 'Elevador 2':
+        return 1;
+      case 'Listo para Entrega':
+        return 2;
+      case 'Finalizado':
+      case 'Entregado':
+        return 3;
+      default:
+        return 0;
+    }
+  };
 
   // Ordenar tickets por fecha de entrada descendente (más reciente arriba)
   const sortedTickets = [...allTickets].sort((a, b) => {
@@ -160,7 +177,7 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
 
   if (!displayTicket) return null;
 
-  const currentIndex = Math.max(0, statusOrder.indexOf(displayTicket.status));
+  const currentIndex = getStepIndex(displayTicket.status);
 
 
   return (
@@ -268,13 +285,13 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
               <div
                 className="absolute top-1/2 left-0 h-1 -translate-y-1/2 rounded-full transition-all duration-500"
                 style={{ 
-                  width: `${(currentIndex / (statusOrder.length - 1)) * 100}%`,
+                  width: `${(currentIndex / (displaySteps.length - 1)) * 100}%`,
                   backgroundColor: primaryColor 
                 }}
               ></div>
 
               <div className="relative flex justify-between">
-                {statusOrder.map((status, index) => {
+                {displaySteps.map((status, index) => {
                   const isCompleted = index <= currentIndex;
                   const isCurrent = index === currentIndex;
 
