@@ -241,7 +241,7 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
                 <h1 className="text-3xl font-bold tracking-tight">{displayTicket.model}</h1>
               </div>
               <p className="text-zinc-400 font-medium flex items-center gap-2">
-                Patente: <span className="font-mono bg-zinc-800 px-2 py-0.5 rounded-md tracking-wider leading-none" style={{ color: primaryColor }}>{displayTicket.id}</span>
+                Patente: <span className="font-mono bg-zinc-800 px-2 py-0.5 rounded-md tracking-wider leading-none" style={{ color: primaryColor }}>{displayTicket.patente || displayTicket.id}</span>
               </p>
             </div>
 

@@ -528,7 +528,8 @@ export function useGarageStore(companyId?: string) {
     // 1. Buscar en estado local
     const local = tickets.find(t => {
       const normalizedTicketId = t.id.replace(/[\s\.\-·]/g, '').toUpperCase();
-      return normalizedTicketId === normalizedInput;
+      const normalizedPatente = (t.patente || '').replace(/[\s\.\-·]/g, '').toUpperCase();
+      return normalizedTicketId === normalizedInput || normalizedPatente === normalizedInput;
     });
 
     if (local) return local;
@@ -763,7 +764,7 @@ export function useGarageStore(companyId?: string) {
       const { data, error } = await supabaseGarage
         .from('romaspa_tickets')
         .select('*')
-        .or(`id.ilike.%${cleanInput}%,owner_phone.ilike.%${cleanInput}%`)
+        .or(`id.ilike.%${cleanInput}%,patente.ilike.%${cleanInput}%,owner_phone.ilike.%${cleanInput}%`)
         .order('entry_date', { ascending: false });
       
       if (error) throw error;
@@ -918,7 +919,7 @@ export function useGarageStore(companyId?: string) {
         .from('romaspa_tickets')
         .select('*')
         .eq('company_id', company_id)
-        .eq('id', normalizedInput)
+        .or(`id.eq.${normalizedInput},patente.eq.${normalizedInput}`)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -972,7 +973,7 @@ export function useGarageStore(companyId?: string) {
       owner_name: customerData?.name || ticketData?.owner_name || '',
       owner_phone: customerData?.phone || ticketData?.owner_phone || '',
       model: customerData?.last_model || ticketData?.model || '',
-      vehicle_id: customerPlate || ticketData?.id || (numericInput.length >= 8 ? '' : normalizedInput)
+      vehicle_id: customerPlate || ticketData?.patente || ticketData?.id || (numericInput.length >= 8 ? '' : normalizedInput)
     };
   }, []);
 

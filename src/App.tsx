@@ -152,7 +152,7 @@ export default function App() {
   };
 
   const handleRefreshPortal = async () => {
-    const identifier = currentCustomerTicket?.id || currentCustomerReminder?.patente;
+    const identifier = currentCustomerTicket?.patente || currentCustomerTicket?.id || currentCustomerReminder?.patente;
     if (identifier) {
       await handleCustomerSearch(identifier);
     }
