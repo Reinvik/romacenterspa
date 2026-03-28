@@ -94,7 +94,7 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
       
       const matchesSearch = !searchTerm || 
         t.owner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (t.patente || t.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.model.toLowerCase().includes(searchTerm.toLowerCase());
         
       return isInRange && matchesSearch;
@@ -326,7 +326,7 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
   }, [filteredSales, salaVentas, timeRange]);
 
   const handleDownload = () => {
-    const headers = ["ID", "Fecha", "Tipo", "Descripción/Cliente", "Monto", "Pago"];
+    const headers = ["Patente", "Fecha", "Tipo", "Descripción/Cliente", "Monto", "Pago"];
     const mechanicNames = new Set(mechanics.map(m => m.name.toLowerCase().trim()));
     
     const rows = filteredSales.map(t => {
@@ -351,7 +351,7 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
       const dateStr = baseDate;
       
       return [
-        t.id,
+        t.patente || t.id,
         dateStr ? format(parseISO(dateStr), 'yyyy-MM-dd') : 'S/F',
         "Servicio",
         t.owner_name,
@@ -647,7 +647,7 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
                     {filteredSales.map((sale) => (
                         <tr key={sale.id} className="hover:bg-zinc-50/80 transition-colors group">
                             <td className="px-6 py-4">
-                                <div className="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">{sale.id}</div>
+                                <div className="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">{sale.patente || sale.id}</div>
                                 <div className="text-xs text-zinc-500">{sale.model}</div>
                             </td>
                             <td className="px-6 py-4">

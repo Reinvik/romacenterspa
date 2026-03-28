@@ -113,8 +113,9 @@ export function Agenda({
                 const isLubricant = searchContent.includes('aceite') || searchContent.includes('lubricante');
 
                 if (isLubricant) {
-                    if (!latestByPatente[ticket.id] || parseISO(latestByPatente[ticket.id].close_date!) < closeDate) {
-                        latestByPatente[ticket.id] = ticket;
+                    const key = ticket.patente || ticket.id;
+                    if (!latestByPatente[key] || parseISO(latestByPatente[key].close_date!) < closeDate) {
+                        latestByPatente[key] = ticket;
                     }
                 }
             }
@@ -239,7 +240,7 @@ export function Agenda({
 
     const sendPreventiveWhatsApp = (ticket: Ticket) => {
         try {
-            const message = `Hola ${ticket.owner_name}, te escribimos de ${settings?.workshop_name || 'Roma Center SPA'} para recordarte que ya han pasado 8 meses desde el último cambio de aceite/lubricante para tu vehículo ${ticket.model} (${ticket.id}). ¿Te gustaría agendar una mantención preventiva para mantenerlo en óptimas condiciones?`;
+            const message = `Hola ${ticket.owner_name}, te escribimos de ${settings?.workshop_name || 'Roma Center SPA'} para recordarte que ya han pasado 8 meses desde el último cambio de aceite/lubricante para tu vehículo ${ticket.model} (${ticket.patente || ticket.id}). ¿Te gustaría agendar una mantención preventiva para mantenerlo en óptimas condiciones?`;
             window.open(`https://wa.me/${ticket.owner_phone}?text=${encodeURIComponent(message)}`, '_blank');
         } catch (e) {
             console.error('Error opening WhatsApp:', e);
@@ -465,7 +466,7 @@ export function Agenda({
                                             <h4 className="font-black text-zinc-900 truncate">{ticket.owner_name}</h4>
                                             <div className="flex items-center gap-2 mt-2">
                                                 <span className="text-[10px] font-mono font-black text-white bg-zinc-900 px-1.5 py-0.5 rounded uppercase">
-                                                    {ticket.id}
+                                                    {ticket.patente || ticket.id}
                                                 </span>
                                                 <span className="text-xs text-zinc-500 font-medium truncate">{ticket.model}</span>
                                             </div>

@@ -179,8 +179,12 @@ export function useGarageStore(companyId?: string) {
         .not('status', 'in', '("Finalizado","Entregado")')
         .maybeSingle();
 
-      const newId = crypto.randomUUID(); // Generar ID único para cada sesión
-      const plate = ticket.id!; // La patente viene en el campo id del formulario
+      const ticketId = crypto.randomUUID(); // Unique ID for this ticket session
+      const patente = (ticket.patente || ticket.id)?.toUpperCase();
+
+      if (!patente) {
+        throw new Error('La patente es requerida para crear un ticket.');
+      }
 
       const initialHistory = [{
         status: ticket.status || 'Ingresado',
@@ -189,17 +193,14 @@ export function useGarageStore(companyId?: string) {
       }];
 
       if (activeTicket) {
-        // Vehículo ya tiene un ticket activo: O lo actualizamos o creamos uno paralelo (decidimos actualizar el activo por seguridad de procesos)
-        // Pero si el usuario quiere "más de un ticket", dejamos que cree uno nuevo con ID distinto.
-        // Si el ticket anterior NO está en estados finales, lo consideramos el mismo.
-        // Pero el requerimiento dice: "se puedan crear mas de un ticket por el mismo auto el mismo dia".
-        // Entonces, creamos uno NUEVO si no hay colisión de ID (que no la hay por ser UUID).
+        // Vehículo ya tiene un ticket activo. Opcionalmente podríamos avisar,
+        // pero el requerimiento es permitir múltiples tickets.
       }
 
-      // Siempre insertamos un nuevo registro para permitir múltiples tickets
+      // Siempre insertamos un nuevo registro para permitir múltiples tickets por patente
       const { error } = await supabaseGarage.from('romaspa_tickets').insert([{
-        id: newId,
-        patente: plate,
+        id: ticketId,
+        patente: patente,
         company_id: companyId,
         model: ticket.model,
         status: ticket.status || 'Ingresado',

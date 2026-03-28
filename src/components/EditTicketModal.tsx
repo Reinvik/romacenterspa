@@ -202,7 +202,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                 )}
                             >
                                 <History className={cn("w-3 h-3", showHistory && "animate-pulse")} />
-                                {ticket.id}
+                                {ticket.patente || ticket.id}
                                 <span className={cn("font-medium lowercase", showHistory ? "text-purple-100" : "text-zinc-400")}>
                                     • {showHistory ? 'Cerrar Hoja de Vida' : 'Ver Hoja de Vida'}
                                 </span>

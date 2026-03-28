@@ -441,7 +441,7 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
                         ) : (
                           <div className="space-y-0.5">
                             <div className="text-xs font-medium text-zinc-300 truncate">
-                              [{item.ticketData?.id}] {item.ticketData?.model}
+                              [{item.ticketData?.patente || item.ticketData?.id}] {item.ticketData?.model}
                             </div>
                           </div>
                         )}

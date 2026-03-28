@@ -223,12 +223,14 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     e.preventDefault();
     
     // Preparar el ticket para enviar
+    const ticketId = formData.id.toUpperCase();
     const ticketToSubmit = {
       ...formData,
-      patente: formData.id, // Guardar la placa en el campo patente
+      id: ticketId,
+      patente: ticketId, // Guardar la placa en el campo patente explícitamente
       total_estimated_cost: totalEstimatedCost,
       cost: totalEstimatedCost,
-      spare_parts: formData.spare_parts // Asegurar que pasamos spare_parts
+      spare_parts: formData.spare_parts
     };
 
     // Actualizar stock solo para repuestos vinculados que NO son mano de obra
