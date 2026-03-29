@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Ticket, TicketStatus, Mechanic, Reminder, PaymentMethod } from '../types';
+import { Ticket, TicketStatus, Mechanic, Reminder, PaymentMethod, DocumentType } from '../types';
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
@@ -38,7 +38,7 @@ import { FinishTicketModal } from './FinishTicketModal';
 interface KanbanBoardProps {
   tickets: Ticket[];
   mechanics: Mechanic[];
-  onUpdateStatus: (id: string, status: TicketStatus, changedBy?: string, paymentMethod?: PaymentMethod) => void;
+  onUpdateStatus: (id: string, status: TicketStatus, changedBy?: string, paymentMethod?: PaymentMethod, documentType?: DocumentType) => void;
   onShowHistory?: (ticket: Ticket) => void;
   onShowCRM?: (ticket: Ticket) => void;
   onEditTicket: (ticket: Ticket) => void;
@@ -544,9 +544,9 @@ export function KanbanBoard({
 
       <FinishTicketModal
         isOpen={!!finishConfirmPending}
-        onConfirm={(method) => {
+        onConfirm={(method, documentType) => {
           if (finishConfirmPending) {
-            onUpdateStatus(finishConfirmPending.id, 'Finalizado', finishConfirmPending.action, method);
+            onUpdateStatus(finishConfirmPending.id, 'Finalizado', finishConfirmPending.action, method, documentType);
             setFinishConfirmPending(null);
           }
         }}

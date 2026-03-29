@@ -7,13 +7,13 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO, subDays, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Part, SalaVenta, SalaVentaItem, GarageSettings, PaymentMethod, Ticket } from '../types';
+import { Part, SalaVenta, SalaVentaItem, GarageSettings, PaymentMethod, Ticket, DocumentType } from '../types';
 import { cn } from '../lib/utils';
 
 interface SalaVentasProps {
   parts: Part[];
   tickets: Ticket[];
-  onAddSalaVenta: (items: SalaVentaItem[], paymentMethod: PaymentMethod, notes?: string) => Promise<void>;
+  onAddSalaVenta: (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, notes?: string) => Promise<void>;
   fetchSalaVentas: (days?: number) => Promise<SalaVenta[]>;
   salaVentas: SalaVenta[];
   settings: GarageSettings | null;
@@ -32,6 +32,7 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
   const [successMsg, setSuccessMsg] = useState('');
   const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d'>('today');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Tarjeta');
+  const [documentType, setDocumentType] = useState<DocumentType>('Boleta');
 
   useEffect(() => {
     fetchSalaVentas(30);
@@ -85,7 +86,7 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
         precio_unitario: c.part.price,
         subtotal: c.part.price * c.cantidad
       }));
-      await onAddSalaVenta(items, paymentMethod, notes || undefined);
+      await onAddSalaVenta(items, paymentMethod, documentType, notes || undefined);
       setCart([]);
       setNotes('');
       setSuccessMsg(`✅ Venta de $${cartTotal.toLocaleString()} registrada`);
@@ -377,6 +378,25 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
                     }`}
                   >
                     {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pl-1">Tipo de Documento</label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['Boleta', 'Factura'] as const).map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setDocumentType(d)}
+                    className={`py-2 text-xs font-bold rounded-xl border transition-all ${
+                      documentType === d 
+                        ? 'bg-zinc-800 border-zinc-800 text-white shadow-md' 
+                        : 'bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300'
+                    }`}
+                  >
+                    {d}
                   </button>
                 ))}
               </div>

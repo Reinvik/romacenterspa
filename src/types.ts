@@ -10,6 +10,7 @@ export type TicketStatus =
   | 'Entregado'; // Estado oculto para CRM
 
 export type PaymentMethod = 'Efectivo' | 'Tarjeta';
+export type DocumentType = 'Boleta' | 'Factura';
 
 export interface TicketHistoryEntry {
   status: TicketStatus;
@@ -64,6 +65,7 @@ export interface Ticket {
   dismissed_at?: string;
   created_at?: string;
   payment_method?: PaymentMethod;
+  document_type?: DocumentType;
 }
 
 export interface Mechanic {
@@ -150,6 +152,7 @@ export interface SalaVenta {
   total: number;
   notes?: string;
   payment_method: PaymentMethod;
+  document_type: DocumentType;
   sold_at: string; // ISO string
   created_at: string; // ISO string
 }
