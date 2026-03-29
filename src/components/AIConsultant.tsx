@@ -21,6 +21,7 @@ interface AIConsultantProps {
 
 export function AIConsultant({ tickets, parts, customers, salaVentas, mechanics, settings }: AIConsultantProps) {
   const [apiKey, setApiKey] = React.useState(() => localStorage.getItem('gemini_api_key') || '');
+  const [modelId, setModelId] = React.useState(() => localStorage.getItem('gemini_model_id') || 'gemini-3-flash-preview');
   const [isKeyValid, setIsKeyValid] = React.useState(!!apiKey);
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [input, setInput] = React.useState('');
@@ -32,9 +33,11 @@ export function AIConsultant({ tickets, parts, customers, salaVentas, mechanics,
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const saveApiKey = (key: string) => {
+  const saveSettings = (key: string, model: string) => {
     localStorage.setItem('gemini_api_key', key);
+    localStorage.setItem('gemini_model_id', model);
     setApiKey(key);
+    setModelId(model);
     setIsKeyValid(!!key);
     setShowKeyInput(false);
   };
@@ -126,7 +129,7 @@ DIRECTRICES:
 
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-3.0-flash" });
+      const model = genAI.getGenerativeModel({ model: modelId });
 
       const chat = model.startChat({
         history: messages.map(m => ({
@@ -231,11 +234,23 @@ DIRECTRICES:
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                   />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Modelo Gemini</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="gemini-3-flash-preview"
+                    className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2.5 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-sm font-mono"
+                    value={modelId}
+                    onChange={(e) => setModelId(e.target.value)}
+                  />
                   <button
-                    onClick={() => saveApiKey(apiKey)}
-                    className="bg-zinc-900 text-white px-6 rounded-xl font-bold text-sm hover:bg-black transition-colors"
+                    onClick={() => saveSettings(apiKey, modelId)}
+                    className="bg-emerald-600 text-white px-6 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/20"
                   >
-                    Guardar
+                    Guardar Todo
                   </button>
                 </div>
                 <a 
