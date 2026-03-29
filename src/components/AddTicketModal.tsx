@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { Mechanic, TicketStatus, Customer, Ticket, GarageSettings, ServiceItem, Part } from '../types';
-import { X, Search, Info, UserPlus, History, PlusCircle, Trash2, Package } from 'lucide-react';
+import { X, Search, Info, UserPlus, History, PlusCircle, Trash2, Package, Loader2 } from 'lucide-react';
 import { CAR_BRANDS, CAR_MODELS } from '../lib/carData';
 
 interface AddTicketModalProps {
@@ -30,6 +30,8 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     entry_date: format(new Date(), 'yyyy-MM-dd'),
     spare_parts: [] as ServiceItem[],
   });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -221,6 +223,7 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
     // Preparar el ticket para enviar
     const ticketId = formData.id.toUpperCase();
@@ -256,8 +259,8 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     try {
       await onAdd(ticketToSubmit);
       onClose();
-    } catch (error: any) {
-      alert("Error al guardar el ticket: " + (error?.message || "Error al conectar con el servidor."));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -644,12 +647,20 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
             </button>
             <button
               type="submit"
-              className="px-8 py-3 text-sm font-black text-white rounded-xl transition-all shadow-lg active:scale-95 flex items-center gap-2"
+              disabled={isSubmitting}
+              className="px-8 py-3 text-sm font-black text-white rounded-xl transition-all shadow-lg active:scale-95 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
               style={{ 
                   backgroundColor: primaryColor,
               }}
             >
-              Registrar Vehículo
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Registrando...
+                </>
+              ) : (
+                'Registrar Vehículo'
+              )}
             </button>
           </div>
         </form>
