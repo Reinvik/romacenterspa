@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Romaspa Patente Scanner",
+  "version": "1.0",
+  "description": "Extrae datos de patentechile.com y registra clientes en la DB de Roma Center SPA.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://patentechile.com/*",
+    "*://www.patentechile.com/*",
+    "*://qtzpzgwyjptbnipvyjdu.supabase.co/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Agregar a Romaspa"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://patentechile.com/*",
+        "*://www.patentechile.com/*"
+      ],
+      "js": ["content.js"]
+    }
+  ]
+}

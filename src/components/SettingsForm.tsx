@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GarageSettings } from '../types';
-import { Save, Building2, MapPin, Phone, MessageSquare, Loader2, CheckCircle, Palette, Download, FileSpreadsheet, Lock, Eye, EyeOff, ScrollText } from 'lucide-react';
+import { Save, Building2, MapPin, Phone, MessageSquare, Loader2, CheckCircle, Palette, Download, FileSpreadsheet, Lock, Eye, EyeOff, ScrollText, Puzzle, ExternalLink, HelpCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Ticket, Part } from '../types';
 import { cn } from '../lib/utils';
@@ -30,7 +30,7 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
     });
     const [loading, setLoading] = useState(false);
     const [saved, setSaved] = useState(false);
-    const [activeTab, setActiveTab] = useState<'general' | 'design' | 'security' | 'export' | 'manual'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'design' | 'security' | 'export' | 'manual' | 'extension'>('general');
     
     // Password Change State
     const [passwordData, setPasswordData] = useState({
@@ -175,6 +175,13 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                         className={cn("flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-sm transition-all", activeTab === 'manual' ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300")}
                     >
                         <ScrollText className="w-4 h-4" /> Manual
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={() => setActiveTab('extension')}
+                        className={cn("flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-sm transition-all", activeTab === 'extension' ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300")}
+                    >
+                        <Puzzle className="w-4 h-4" /> Extensión
                     </button>
                 </div>
             </div>
@@ -485,7 +492,63 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                 </div>
                 ) : activeTab === 'manual' ? (
                     <OperationsManual themeColor={formData.theme_menu_highlight} />
-                ) : (
+                ) : activeTab === 'extension' ? (
+                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-2xl">
+                     <div className="bg-zinc-900 rounded-2xl p-6 text-white overflow-hidden relative group">
+                        <div className="relative z-10">
+                            <h3 className="text-xl font-black mb-2 flex items-center gap-2 font-mono italic">
+                                <Puzzle className="w-6 h-6 text-emerald-400" />
+                                SCANNER DE PATENTES
+                            </h3>
+                            <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
+                                Automatiza el registro de clientes directamente desde <span className="text-white font-bold italic underline decoration-emerald-500">patentechile.com</span>.
+                                Ahorra tiempo y evita errores manuales en el ingreso de datos de vehículos.
+                            </p>
+                            <a 
+                                href="/romaspa-extension.zip" 
+                                download 
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black rounded-xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95 text-sm uppercase tracking-wider"
+                            >
+                                <Download className="w-5 h-5" />
+                                Descargar Extensión (.zip)
+                            </a>
+                        </div>
+                        {/* Decorative Puzzle Icon Background */}
+                        <Puzzle className="absolute -right-8 -bottom-8 w-40 h-40 text-white/5 rotate-12 group-hover:rotate-0 transition-transform duration-700 pointer-events-none" />
+                     </div>
+
+                     <div className="space-y-6">
+                        <h4 className="text-sm font-black text-zinc-900 uppercase tracking-widest flex items-center gap-2">
+                            <HelpCircle className="w-4 h-4 text-emerald-500" />
+                            Guía de Instalación Rápida
+                        </h4>
+                        
+                        <div className="grid grid-cols-1 gap-4">
+                            {[
+                                { step: '1', title: 'Descarga y Descomprime', text: 'Descarga el archivo ZIP usando el botón de arriba y extrae su contenido en una carpeta permanente en tu computadora (ej: Documentos/RomaspaExtension).' },
+                                { step: '2', title: 'Modo Desarrollador', text: 'Abre Chrome y ve a la dirección: chrome://extensions/. Activa el interruptor de "Modo de desarrollador" que está arriba a la derecha.' },
+                                { step: '3', title: 'Carga la Extensión', text: 'Haz clic en el botón "Cargar descomprimida" y selecciona la carpeta donde extrajiste los archivos en el paso 1.' },
+                                { step: '4', title: 'Configura y Usa', text: 'Recarga patentechile.com, busca una patente y usa la extensión desde el icono del rompecabezas de Chrome. Inicia sesión con tus mismas credenciales de esta App.' }
+                            ].map((item, idx) => (
+                                <div key={idx} className="flex gap-4 p-4 rounded-2xl border border-zinc-100 bg-white hover:border-emerald-200 transition-colors">
+                                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-900 text-white flex items-center justify-center font-black text-sm">{item.step}</span>
+                                    <div>
+                                        <h5 className="font-bold text-zinc-900 text-sm leading-none mb-1">{item.title}</h5>
+                                        <p className="text-xs text-zinc-500 leading-relaxed">{item.text}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 flex gap-3 items-start">
+                            <ExternalLink className="w-5 h-5 text-blue-500 shrink-0" />
+                            <p className="text-xs text-blue-700">
+                                <strong>Nota:</strong> Al ser una extensión de uso interno (no publicada en la Web Store), debes asegurarte de no borrar la carpeta que selecciones en el paso 3 para que el navegador pueda seguir cargándola.
+                            </p>
+                        </div>
+                     </div>
+                 </div>
+                 ) : (
                 <div className="space-y-6">
                      <p className="text-sm text-zinc-600 mb-6">Personaliza los colores de la barra lateral para que coincidan con la identidad corporativa de tu marca.</p>
                      
@@ -559,7 +622,7 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                 </div>
                 )}
 
-                {activeTab !== 'export' && activeTab !== 'manual' && (
+                {activeTab !== 'export' && activeTab !== 'manual' && activeTab !== 'extension' && (
                 <div className="pt-6 flex items-center justify-between border-t border-zinc-100">
                     {saved && (
                         <span className="text-sm font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2" style={{ color: formData.theme_menu_highlight }}>
