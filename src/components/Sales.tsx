@@ -20,13 +20,26 @@ interface SalesProps {
   mechanics?: Mechanic[];
 }
 
+// Import dates: tickets created on these dates are legacy historical data
+const LEGACY_IMPORT_DATES = ['2026-03-15', '2026-03-17'];
+
+/** Returns the effective display date for a ticket, using entry_date for legacy imports */
+function getEffectiveDate(t: Ticket): string | null {
+  const createdDate = (t.created_at || '').slice(0, 10);
+  const isLegacyImport = LEGACY_IMPORT_DATES.includes(createdDate);
+
+  if (isLegacyImport) {
+    return t.entry_date || t.close_date || t.created_at || null;
+  }
+  return t.last_status_change || t.close_date || t.entry_date || t.created_at || null;
+}
+
 export function Sales({ tickets, salaVentas, parts = [], settings = null, mechanics = [] }: SalesProps) {
   const [timeRange, setTimeRange] = useState<'1d' | '7d' | '30d' | 'all'>('7d');
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
 
   // Helper: get the best available amount for a ticket
-  // Priority: cost > quotation_total > sum(spare_parts)
   const getTicketAmount = (t: Ticket): number => {
     if (t.cost && t.cost > 0) return t.cost;
     if (t.quotation_total && t.quotation_total > 0) return t.quotation_total;
@@ -41,7 +54,7 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
     return total;
   };
 
-  // 1. Filter tickets that are "Finalizado" or "Entregado" (Sales)
+  // 1. Filter tickets that are "Finalizado" or "Entregado"
   const salesTickets = useMemo(() => {
     return tickets.filter(t => t.status === 'Finalizado' || t.status === 'Entregado');
   }, [tickets]);
@@ -61,30 +74,9 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
       startDate = subDays(now, 30);
     }
 
-    const mechanicNames = new Set(mechanics.map(m => m.name.toLowerCase().trim()));
-
     return salesTickets.filter(t => {
-      const mValue = (t.mechanic || '').toLowerCase().trim();
-      const isUnowned = !mValue || mValue === 'sin asignar' || mValue === 'unassigned';
-      
-      const ticketCreatedStr = t.created_at || '';
-      const isNewTicket = ticketCreatedStr >= '2026-03-01';
-      const isLegacyTicket = !isNewTicket && (t.entry_date || '') < '2026-03-17T00:00:00';
-      const useEntryDate = isUnowned && isLegacyTicket;
-
-      let baseDate = t.close_date || t.last_status_change || t.entry_date || t.created_at;
-      if (t.last_status_change && t.close_date && t.last_status_change > t.close_date) {
-        baseDate = t.last_status_change;
-      }
-      if (isUnowned && isLegacyTicket) {
-        baseDate = t.entry_date;
-      }
-      
-      if (isNewTicket && (!baseDate || baseDate < '2026-03-01')) {
-          baseDate = t.created_at;
-      }
-
-      const closeDate = baseDate ? parseISO(baseDate) : null;
+      const baseDateStr = getEffectiveDate(t);
+      const closeDate = baseDateStr ? parseISO(baseDateStr) : null;
       if (!closeDate) return false;
       
       const closeDateDay = format(closeDate, 'yyyy-MM-dd');
@@ -99,20 +91,17 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
         
       return isInRange && matchesSearch;
     }).sort((a, b) => {
-        const dateA = a.close_date ? parseISO(a.close_date).getTime() : 0;
-        const dateB = b.close_date ? parseISO(b.close_date).getTime() : 0;
-        return dateB - dateA;
+        const dateA = getEffectiveDate(a);
+        const dateB = getEffectiveDate(b);
+        return (dateB ? parseISO(dateB).getTime() : 0) - (dateA ? parseISO(dateA).getTime() : 0);
     });
-  }, [salesTickets, timeRange, selectedDate, searchTerm, mechanics]);
+  }, [salesTickets, timeRange, selectedDate, searchTerm]);
 
-  // 3. KPI Calculations — includes Sala Ventas (counter / POS sales)
+  // 3. KPI Calculations
   const stats = useMemo(() => {
     const now = new Date();
-    
-    // Revenue from tickets
     const ticketRevenue = filteredSales.reduce((acc, t) => acc + getTicketAmount(t), 0);
 
-    // Filter Sala Ventas based on date range
     let startDate: Date | null = null;
     let endDate: Date | null = null;
     if (timeRange === '1d') {
@@ -128,24 +117,16 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
       const d = v.sold_at ? parseISO(v.sold_at) : null;
       if (!d) return false;
       const dayStr = format(d, 'yyyy-MM-dd');
-      const isInRange = timeRange === '1d' 
-        ? dayStr === selectedDate
-        : (!startDate || d >= startDate);
-      return isInRange; 
+      return timeRange === '1d' ? dayStr === selectedDate : (!startDate || d >= startDate);
     });
 
     const posRevenue = filteredSalaVentas.reduce((acc, v) => acc + (v.total || 0), 0);
     const totalRevenue = ticketRevenue + posRevenue;
-
     const totalCount = filteredSales.length + filteredSalaVentas.length;
-    const avgTicket = totalCount > 0 ? totalRevenue / totalCount : 0;
     
-    // Cash / Card split for Tickets
     const cashTickets = filteredSales.filter(t => (t as any).payment_method === 'Efectivo').reduce((acc, t) => acc + getTicketAmount(t), 0);
-    const cardTickets = filteredSales.filter(t => (t as any).payment_method !== 'Efectivo').reduce((acc, t) => acc + getTicketAmount(t), 0);
-
-    // Cash / Card split for POS
     const cashPOS = filteredSalaVentas.filter(v => v.payment_method === 'Efectivo').reduce((acc, v) => acc + (v.total || 0), 0);
+    const cardTickets = filteredSales.filter(t => (t as any).payment_method !== 'Efectivo').reduce((acc, t) => acc + getTicketAmount(t), 0);
     const cardPOS = filteredSalaVentas.filter(v => v.payment_method !== 'Efectivo').reduce((acc, v) => acc + (v.total || 0), 0);
 
     return {
@@ -157,10 +138,9 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
     };
   }, [filteredSales, salaVentas, timeRange, selectedDate, searchTerm]);
 
-  // 4. Data for Chart (Daily or Monthly Sales)
+  // 4. Chart Data
   const chartData = useMemo(() => {
     if (timeRange === 'all') {
-      // Last 12 months
       const end = new Date();
       const start = subMonths(end, 11);
       const months = eachMonthOfInterval({ start, end });
@@ -169,28 +149,9 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
         const mStart = startOfMonth(month);
         const mEnd = endOfMonth(month);
 
-        const mechanicNames = new Set(mechanics.map(m => m.name.toLowerCase().trim()));
-
         const mSales = salesTickets.filter(t => {
-          const mName = (t.mechanic || '').toLowerCase().trim();
-          const isUnowned = !mName || mName === 'sin asignar' || mName === 'unassigned' || !mechanicNames.has(mName);
-          
-          const ticketCreatedStr = t.created_at || '';
-          const isNewTicket = ticketCreatedStr >= '2026-03-01';
-          const isLegacyTicket = !isNewTicket && (t.entry_date || '') < '2026-03-17T00:00:00';
-
-          let baseDate = t.close_date || t.last_status_change || t.entry_date || t.created_at;
-          if (t.last_status_change && t.close_date && t.last_status_change > t.close_date) {
-            baseDate = t.last_status_change;
-          }
-          if (isUnowned && isLegacyTicket) {
-            baseDate = t.entry_date;
-          }
-          if (isNewTicket && (!baseDate || baseDate < '2026-03-01')) {
-            baseDate = t.created_at;
-          }
-
-          const closeDate = baseDate ? parseISO(baseDate) : null;
+          const baseDateStr = getEffectiveDate(t);
+          const closeDate = baseDateStr ? parseISO(baseDateStr) : null;
           return closeDate && isWithinInterval(closeDate, { start: mStart, end: mEnd });
         });
         
@@ -214,45 +175,23 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
       });
 
       const maxVal = Math.max(...data.map(d => d.total), 1);
-      return data.map(d => ({ 
+      return { data: data.map(d => ({ 
         ...d, 
         height: (d.total / maxVal) * 100,
         workshopHeight: (d.workshopTotal / maxVal) * 100,
         posHeight: (d.posTotal / maxVal) * 100
-      }));
+      })), maxVal };
     }
 
     const daysCount = timeRange === '7d' ? 7 : 30;
     
     const data = Array.from({ length: daysCount }, (_, i) => {
       const date = subDays(new Date(), daysCount - 1 - i);
-      const dayStart = startOfDay(date);
-      const dayEnd = endOfDay(date);
-      
       const targetDayStr = format(date, 'yyyy-MM-dd');
       
-      const mechanicNames = new Set(mechanics.map(m => m.name.toLowerCase().trim()));
-
       const daySales = salesTickets.filter(t => {
-        const mName = (t.mechanic || '').toLowerCase().trim();
-        const isUnowned = !mName || mName === 'sin asignar' || mName === 'unassigned' || !mechanicNames.has(mName);
-        
-        const ticketCreatedStr = t.created_at || '';
-        const isNewTicket = ticketCreatedStr >= '2026-03-01';
-        const isLegacyTicket = !isNewTicket && (t.entry_date || '') < '2026-03-17T00:00:00';
-
-        let baseDate = t.close_date || t.last_status_change || t.entry_date || t.created_at;
-        if (t.last_status_change && t.close_date && t.last_status_change > t.close_date) {
-          baseDate = t.last_status_change;
-        }
-        if (isUnowned && isLegacyTicket) {
-          baseDate = t.entry_date;
-        }
-        if (isNewTicket && (!baseDate || baseDate < '2026-03-01')) {
-          baseDate = t.created_at;
-        }
-
-        const closeDate = baseDate ? parseISO(baseDate) : null;
+        const baseDateStr = getEffectiveDate(t);
+        const closeDate = baseDateStr ? parseISO(baseDateStr) : null;
         return closeDate && format(closeDate, 'yyyy-MM-dd') === targetDayStr;
       });
       
@@ -276,15 +215,18 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
     });
 
     const maxVal = Math.max(...data.map(d => d.total), 1);
-    return data.map(d => ({
-      ...d,
-      height: (d.total / maxVal) * 100,
-      workshopHeight: (d.workshopTotal / maxVal) * 100,
-      posHeight: (d.posTotal / maxVal) * 100
-    }));
+    return {
+      data: data.map(d => ({
+        ...d,
+        height: (d.total / maxVal) * 100,
+        workshopHeight: (d.workshopTotal / maxVal) * 100,
+        posHeight: (d.posTotal / maxVal) * 100
+      })),
+      maxVal
+    };
   }, [salesTickets, salaVentas, timeRange]);
 
-  // 5. TOP SELLERS calculation
+  // 5. TOP SELLERS
   const topSellers = useMemo(() => {
     const servicesMap: Record<string, { qty: number; total: number }> = {};
     const productsMap: Record<string, { qty: number; total: number }> = {};
@@ -295,23 +237,18 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
     };
 
     filteredSales.forEach(t => {
-      // From spare_parts (sometimes services are here if not separated)
       (t.spare_parts || []).forEach(sp => {
         const map = isLabor(sp.descripcion) ? servicesMap : productsMap;
         if (!map[sp.descripcion]) map[sp.descripcion] = { qty: 0, total: 0 };
         map[sp.descripcion].qty += (sp.cantidad || 1);
         map[sp.descripcion].total += (sp.costo || 0) * (sp.cantidad || 1);
       });
-      // From services
       (t.services || []).forEach(s => {
         if (!servicesMap[s.descripcion]) servicesMap[s.descripcion] = { qty: 0, total: 0 };
         servicesMap[s.descripcion].qty += (s.cantidad || 1);
         servicesMap[s.descripcion].total += (s.costo || 0) * (s.cantidad || 1);
       });
     });
-
-    // Removed Sala Ventas from top sellers calculation per user request
-
 
     const sortAndSlice = (map: Record<string, any>) => 
       Object.entries(map)
@@ -323,33 +260,13 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
       services: sortAndSlice(servicesMap),
       products: sortAndSlice(productsMap)
     };
-  }, [filteredSales, salaVentas, timeRange]);
+  }, [filteredSales]);
 
   const handleDownload = () => {
     const headers = ["Patente", "Fecha", "Tipo", "Descripción/Cliente", "Monto", "Pago"];
-    const mechanicNames = new Set(mechanics.map(m => m.name.toLowerCase().trim()));
     
     const rows = filteredSales.map(t => {
-      const mName = (t.mechanic || '').toLowerCase().trim();
-      const isUnowned = !mName || mName === 'sin asignar' || mName === 'unassigned' || !mechanicNames.has(mName);
-      
-      const ticketCreatedStr = t.created_at || '';
-      const isNewTicket = ticketCreatedStr >= '2026-03-01';
-      const isLegacyTicket = !isNewTicket && (t.entry_date || '') < '2026-03-17T00:00:00';
-
-      let baseDate = t.close_date || t.last_status_change || t.entry_date || t.created_at || '';
-      if (t.last_status_change && t.close_date && t.last_status_change > t.close_date) {
-        baseDate = t.last_status_change;
-      }
-      if (isUnowned && isLegacyTicket) {
-        baseDate = t.entry_date;
-      }
-      if (isNewTicket && (!baseDate || baseDate < '2026-03-01')) {
-        baseDate = t.created_at;
-      }
-
-      const dateStr = baseDate;
-      
+      const dateStr = getEffectiveDate(t);
       return [
         t.patente || t.id,
         dateStr ? format(parseISO(dateStr), 'yyyy-MM-dd') : 'S/F',
@@ -360,14 +277,10 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
       ];
     });
 
-    // Removed Sala Ventas from CSV download per user request
-
-
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Ventas");
 
-    // Ajustar anchos de columna
     const maxWidths = headers.map((h, i) => {
       const colData = [h, ...rows.map(r => r[i]?.toString() || "")];
       return Math.max(...colData.map(val => val.length)) + 2;
@@ -377,9 +290,24 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
     XLSX.writeFile(workbook, `reporte_ventas_${timeRange}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
+  // Y-axis label formatter
+  const formatYAxis = (val: number): string => {
+    if (val === 0) return '$0';
+    if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}M`;
+    if (val >= 1_000) return `$${(val / 1_000).toFixed(0)}k`;
+    return `$${val.toLocaleString()}`;
+  };
+
+  const yAxisTicks = useMemo(() => {
+    const max = chartData.maxVal;
+    if (max <= 0) return [0];
+    const steps = 4;
+    return Array.from({ length: steps + 1 }, (_, i) => Math.round((max / steps) * i));
+  }, [chartData.maxVal]);
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Header Evolution 4.0 */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black tracking-tight text-zinc-900 flex items-center gap-3">
@@ -387,7 +315,7 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
               <BarChart3 className="w-8 h-8" />
             </div>
             Informe de Ventas
-            <span className="text-xs font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200">v4.2</span>
+            <span className="text-xs font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200">v4.3</span>
           </h2>
           <p className="text-zinc-500 mt-1 font-medium">Facturación y movimientos por período.</p>
         </div>
@@ -437,6 +365,7 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
         </div>
       </div>
 
+      {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <KpiCard 
           title="Ventas Totales"
@@ -472,146 +401,188 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
         />
       </div>
 
-        {/* Tendencia Periódica - Full Width Row */}
-        <div className="bg-white rounded-3xl border border-zinc-200 shadow-xl overflow-hidden group">
-          <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
-            <h3 className="font-bold text-zinc-800 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-emerald-600" />
-              {timeRange === 'all' ? 'Desempeño Anual' : 'Tendencia Periódica'}
-            </h3>
+      {/* Chart */}
+      <div className="bg-white rounded-3xl border border-zinc-200 shadow-xl overflow-hidden group">
+        <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+          <h3 className="font-bold text-zinc-800 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-emerald-600" />
+            {timeRange === 'all' ? 'Desempeño Anual' : 'Tendencia Periódica'}
+          </h3>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600">
+              <div className="w-2.5 h-2.5 rounded-sm bg-indigo-500" /> Taller
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
+              <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Mesón
+            </div>
             <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
-              {timeRange === 'all' ? 'Ingresos por mes' : 'Ingresos por día'}
+              {timeRange === 'all' ? 'Por mes' : 'Por día'}
             </span>
           </div>
-          
-          <div className="p-8 h-64 flex items-end justify-between gap-2 md:gap-4">
-            {chartData.map((day, idx) => (
-              <div key={idx} className="flex-1 flex flex-col items-center gap-3 h-full justify-end">
-                <div className="relative w-full group/bar h-full flex flex-col justify-end overflow-hidden rounded-t-lg">
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: `${day.workshopHeight}%` }}
-                    transition={{ duration: 1, delay: 0.1 + idx * 0.05, ease: "easeOut" }}
-                    className={cn(
-                      "w-full min-h-[2px] bg-indigo-500 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] transition-all duration-300",
-                      idx === chartData.length - 1 ? "bg-indigo-600" : "opacity-80 group-hover/bar:opacity-100"
-                    )}
-                  />
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: `${day.posHeight}%` }}
-                    transition={{ duration: 1, delay: 0.1 + idx * 0.05, ease: "easeOut" }}
-                    className={cn(
-                      "w-full min-h-[2px] bg-emerald-500 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] transition-all duration-300",
-                      idx === chartData.length - 1 ? "bg-emerald-600" : "opacity-80 group-hover/bar:opacity-100"
-                    )}
-                  />
-                  
-                  <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[10px] px-3 py-2 rounded-xl opacity-0 group-hover/bar:opacity-100 transition-all scale-75 group-hover/bar:scale-100 whitespace-nowrap z-20 font-bold pointer-events-none flex flex-col gap-1 shadow-2xl ring-1 ring-white/10">
-                    <span className="text-zinc-400 text-[8px] uppercase tracking-wider border-b border-white/10 pb-1 mb-1">{day.fullDate}</span>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-indigo-300">Taller:</span>
-                      <span>${day.workshopTotal.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-emerald-300">Mesón:</span>
-                      <span>${day.posTotal.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4 pt-1 mt-1 border-t border-white/10 text-xs">
-                      <span>Total:</span>
-                      <span className="text-white">${day.total.toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-                <span className={cn(
-                  "text-[8px] md:text-[10px] font-black uppercase text-zinc-400 tracking-tighter",
-                  timeRange === 'all' ? "rotate-0" : ""
-                )}>{day.label}</span>
-              </div>
+        </div>
+        
+        {/* Chart area with Y-axis */}
+        <div className="p-6 pb-2 flex gap-2">
+          {/* Y-axis labels */}
+          <div className="flex flex-col justify-between h-52 pr-2 text-right shrink-0">
+            {[...yAxisTicks].reverse().map((tick, i) => (
+              <span key={i} className="text-[9px] font-bold text-zinc-400 leading-none">
+                {formatYAxis(tick)}
+              </span>
             ))}
           </div>
 
-          <div className="px-8 py-6 bg-zinc-50 border-t border-zinc-100 flex items-center justify-between">
-             <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-emerald-600">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-                    Actual: ${chartData[chartData.length - 1].total.toLocaleString()}
-                </div>
-                <div className="flex items-center gap-2 text-xs font-bold text-zinc-400">
-                    <div className="w-3 h-3 rounded-full bg-zinc-300" />
-                    Promedio: ${Math.round(chartData.reduce((a, b) => a + b.total, 0) / chartData.length).toLocaleString()}
-                </div>
-             </div>
-          </div>
-        </div>
-
-        {/* Second Row: Top Sellers (Side by Side) */}
-        <div className="bg-white rounded-3xl border border-zinc-200 shadow-xl overflow-hidden flex flex-col mb-8">
-          <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
-            <h3 className="font-bold text-zinc-800 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-indigo-600" />
-              Lo más vendido
-            </h3>
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Top 5</span>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 p-8">
-            {/* Products (Left) */}
-            <div>
-              <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                <Package className="w-4 h-4" /> Insumos / Repuestos
-              </h4>
-              <div className="space-y-5">
-                {topSellers.products.map((p, i) => (
-                  <div key={i} className="flex flex-col gap-2">
-                    <div className="flex justify-between text-sm font-bold">
-                      <span className="truncate pr-4 text-zinc-700">{p.name}</span>
-                      <span className="text-zinc-900 whitespace-nowrap">${p.total.toLocaleString()}</span>
-                    </div>
-                    <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(p.total / (topSellers.products[0]?.total || 1)) * 100}%` }}
-                        className="h-full bg-emerald-500" 
-                      />
-                    </div>
-                  </div>
-                ))}
-                {topSellers.products.length === 0 && (
-                  <div className="text-zinc-400 text-sm italic">Sin datos registrados en el periodo.</div>
-                )}
-              </div>
+          {/* Bars */}
+          <div className="flex-1 relative">
+            {/* Horizontal grid lines */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+              {yAxisTicks.map((_, i) => (
+                <div key={i} className="w-full border-t border-zinc-100" />
+              ))}
             </div>
 
-            {/* Services (Right) */}
-            <div>
-              <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                <Wrench className="w-4 h-4" /> Servicios / M.O.
-              </h4>
-              <div className="space-y-5">
-                {topSellers.services.map((s, i) => (
-                  <div key={i} className="flex flex-col gap-2">
-                    <div className="flex justify-between text-sm font-bold">
-                      <span className="truncate pr-4 text-zinc-700">{s.name}</span>
-                      <span className="text-zinc-900 whitespace-nowrap">${s.total.toLocaleString()}</span>
+            <div className="h-52 flex items-end justify-between gap-1 md:gap-2 relative">
+              {chartData.data.map((day, idx) => (
+                <div key={idx} className="flex-1 flex flex-col items-center gap-0 h-full justify-end">
+                  <div className="relative w-full group/bar h-full flex flex-col justify-end overflow-visible rounded-t-sm">
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-zinc-900 text-white text-[10px] px-3 py-2 rounded-xl opacity-0 group-hover/bar:opacity-100 transition-all scale-75 group-hover/bar:scale-100 whitespace-nowrap z-20 font-bold pointer-events-none flex flex-col gap-1 shadow-2xl ring-1 ring-white/10">
+                      <span className="text-zinc-400 text-[8px] uppercase tracking-wider border-b border-white/10 pb-1 mb-1">{day.fullDate}</span>
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-indigo-300">Taller:</span>
+                        <span>${day.workshopTotal.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-emerald-300">Mesón:</span>
+                        <span>${day.posTotal.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 pt-1 mt-1 border-t border-white/10 text-xs">
+                        <span>Total:</span>
+                        <span className="text-white">${day.total.toLocaleString()}</span>
+                      </div>
                     </div>
-                    <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(s.total / (topSellers.services[0]?.total || 1)) * 100}%` }}
-                        className="h-full bg-indigo-500" 
-                      />
-                    </div>
+
+                    {/* Workshop bar (indigo) */}
+                    <motion.div
+                      initial={{ height: 0 }}
+                      animate={{ height: `${day.workshopHeight}%` }}
+                      transition={{ duration: 0.8, delay: 0.05 + idx * 0.03, ease: "easeOut" }}
+                      className={cn(
+                        "w-full min-h-[2px] bg-indigo-500 transition-all duration-300",
+                        idx === chartData.data.length - 1 ? "bg-indigo-600" : "opacity-80 group-hover/bar:opacity-100"
+                      )}
+                    />
+                    {/* POS bar (emerald) */}
+                    <motion.div
+                      initial={{ height: 0 }}
+                      animate={{ height: `${day.posHeight}%` }}
+                      transition={{ duration: 0.8, delay: 0.05 + idx * 0.03, ease: "easeOut" }}
+                      className={cn(
+                        "w-full min-h-[2px] bg-emerald-500 transition-all duration-300",
+                        idx === chartData.data.length - 1 ? "bg-emerald-600" : "opacity-80 group-hover/bar:opacity-100"
+                      )}
+                    />
                   </div>
-                ))}
-                {topSellers.services.length === 0 && (
-                  <div className="text-zinc-400 text-sm italic">Sin datos registrados en el periodo.</div>
-                )}
-              </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
+        {/* X-axis labels */}
+        <div className="px-6 pb-4 flex gap-2">
+          <div className="shrink-0" style={{ width: '38px' }} />
+          <div className="flex-1 flex justify-between gap-1 md:gap-2">
+            {chartData.data.map((day, idx) => (
+              <div key={idx} className="flex-1 text-center">
+                <span className="text-[8px] md:text-[9px] font-black uppercase text-zinc-400 tracking-tighter">
+                  {day.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="px-8 py-4 bg-zinc-50 border-t border-zinc-100 flex items-center justify-between">
+           <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-600">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+                  Actual: ${chartData.data[chartData.data.length - 1].total.toLocaleString()}
+              </div>
+              <div className="flex items-center gap-2 text-xs font-bold text-zinc-400">
+                  <div className="w-3 h-3 rounded-full bg-zinc-300" />
+                  Promedio: ${Math.round(chartData.data.reduce((a, b) => a + b.total, 0) / chartData.data.length).toLocaleString()}
+              </div>
+           </div>
+        </div>
+      </div>
+
+      {/* Top Sellers */}
+      <div className="bg-white rounded-3xl border border-zinc-200 shadow-xl overflow-hidden flex flex-col mb-8">
+        <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
+          <h3 className="font-bold text-zinc-800 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-indigo-600" />
+            Lo más vendido
+          </h3>
+          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Top 5</span>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 p-8">
+          <div>
+            <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+              <Package className="w-4 h-4" /> Insumos / Repuestos
+            </h4>
+            <div className="space-y-5">
+              {topSellers.products.map((p, i) => (
+                <div key={i} className="flex flex-col gap-2">
+                  <div className="flex justify-between text-sm font-bold">
+                    <span className="truncate pr-4 text-zinc-700">{p.name}</span>
+                    <span className="text-zinc-900 whitespace-nowrap">${p.total.toLocaleString()}</span>
+                  </div>
+                  <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(p.total / (topSellers.products[0]?.total || 1)) * 100}%` }}
+                      className="h-full bg-emerald-500" 
+                    />
+                  </div>
+                </div>
+              ))}
+              {topSellers.products.length === 0 && (
+                <div className="text-zinc-400 text-sm italic">Sin datos registrados en el periodo.</div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+              <Wrench className="w-4 h-4" /> Servicios / M.O.
+            </h4>
+            <div className="space-y-5">
+              {topSellers.services.map((s, i) => (
+                <div key={i} className="flex flex-col gap-2">
+                  <div className="flex justify-between text-sm font-bold">
+                    <span className="truncate pr-4 text-zinc-700">{s.name}</span>
+                    <span className="text-zinc-900 whitespace-nowrap">${s.total.toLocaleString()}</span>
+                  </div>
+                  <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(s.total / (topSellers.services[0]?.total || 1)) * 100}%` }}
+                      className="h-full bg-indigo-500" 
+                    />
+                  </div>
+                </div>
+              ))}
+              {topSellers.services.length === 0 && (
+                <div className="text-zinc-400 text-sm italic">Sin datos registrados en el periodo.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Ticket table */}
       <div className="bg-white rounded-3xl border border-zinc-200 shadow-xl overflow-hidden">
         <div className="p-6 border-b border-zinc-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -644,7 +615,9 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                    {filteredSales.map((sale) => (
+                    {filteredSales.map((sale) => {
+                      const dateStr = getEffectiveDate(sale);
+                      return (
                         <tr key={sale.id} className="hover:bg-zinc-50/80 transition-colors group">
                             <td className="px-6 py-4">
                                 <div className="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">{sale.patente || sale.id}</div>
@@ -656,16 +629,7 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
                             <td className="px-6 py-4">
                                 <div className="text-xs text-zinc-500 flex items-center gap-1.5 font-bold">
                                     <Calendar className="w-3.5 h-3.5" />
-                                    {(() => {
-                                        const mechanicNames = new Set(mechanics.map(m => m.name.toLowerCase().trim()));
-                                        const mName = (sale.mechanic || '').toLowerCase().trim();
-                                        const isUnowned = !mName || mName === 'sin asignar' || mName === 'unassigned' || !mechanicNames.has(mName);
-                                        const isMigrationDay = sale.close_date?.startsWith('2026-03-16');
-                                        const useEntryDate = isUnowned || isMigrationDay;
-
-                                        const dateStr = (useEntryDate ? sale.entry_date : sale.close_date) || sale.entry_date || sale.close_date || sale.last_status_change;
-                                        return dateStr ? format(parseISO(dateStr), "d 'de' MMM, yyyy", { locale: es }) : 'S/F';
-                                    })()}
+                                    {dateStr ? format(parseISO(dateStr), "d 'de' MMM, yyyy", { locale: es }) : 'S/F'}
                                 </div>
                             </td>
                              <td className="px-6 py-4 text-right">
@@ -682,7 +646,8 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
                                     </span>
                              </td>
                         </tr>
-                    ))}
+                      );
+                    })}
                 </tbody>
             </table>
         </div>
