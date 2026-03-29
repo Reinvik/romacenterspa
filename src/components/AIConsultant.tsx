@@ -126,7 +126,7 @@ DIRECTRICES:
 
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-3.0-flash" });
 
       const chat = model.startChat({
         history: messages.map(m => ({
