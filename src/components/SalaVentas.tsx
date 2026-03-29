@@ -135,27 +135,22 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
       ticketData: undefined
     }));
     
+    // Import dates: tickets created on these dates are legacy historical data
+    const LEGACY_IMPORT_DATES = ['2026-03-15', '2026-03-17'];
+
     const ticketItems = tickets
       .filter(t => t.status === 'Finalizado' || t.status === 'Entregado')
       .map(t => {
-        const mValue = (t.mechanic || '').toLowerCase().trim();
-        const isUnowned = !mValue || mValue === 'sin asignar' || mValue === 'unassigned';
+        const ticketCreatedDate = (t.created_at || '').slice(0, 10);
+        const isLegacyImport = LEGACY_IMPORT_DATES.includes(ticketCreatedDate);
 
-        const ticketCreatedStr = t.created_at || '';
-        const isNewTicket = ticketCreatedStr >= '2026-03-01';
-        const isLegacyTicket = !isNewTicket && (t.entry_date || '') < '2026-03-17T00:00:00';
-        const useEntryDate = isUnowned && isLegacyTicket;
-
-        let effectiveDate = t.close_date || t.last_status_change || t.entry_date || t.created_at || new Date().toISOString();
-        if (t.last_status_change && t.close_date && t.last_status_change > t.close_date) {
-          effectiveDate = t.last_status_change;
-        }
-        
-        if (useEntryDate) {
-          effectiveDate = '2025-03-16T12:00:00Z';
-        } else if (isNewTicket && effectiveDate < '2026-03-01') {
-          // If created now but has old data, show it now
-          effectiveDate = t.created_at || new Date().toISOString();
+        // For legacy imported tickets, always use entry_date (the real historical service date)
+        // For real tickets, use last_status_change or close_date
+        let effectiveDate: string;
+        if (isLegacyImport) {
+          effectiveDate = t.entry_date || t.close_date || t.created_at || new Date().toISOString();
+        } else {
+          effectiveDate = t.last_status_change || t.close_date || t.entry_date || t.created_at || new Date().toISOString();
         }
 
         return {
