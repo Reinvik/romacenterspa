@@ -179,7 +179,8 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-8 max-w-2xl">
+            <div className={cn("p-4 md:p-8", activeTab !== 'manual' ? "max-w-3xl mx-auto" : "max-w-7xl mx-auto w-full")}>
+                <form onSubmit={handleSubmit} className="space-y-8">
                 {activeTab === 'general' ? (
                 <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -576,7 +577,8 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                     </button>
                 </div>
                 )}
-            </form>
+                </form>
+            </div>
         </div>
     );
 }

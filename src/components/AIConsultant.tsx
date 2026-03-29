@@ -126,7 +126,7 @@ DIRECTRICES:
 
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
       const chat = model.startChat({
         history: messages.map(m => ({
@@ -174,7 +174,7 @@ DIRECTRICES:
   };
 
   return (
-    <div className="flex flex-col h-full bg-zinc-50 overflow-hidden relative">
+    <div className="flex flex-col h-full bg-zinc-50 overflow-hidden">
       {/* Header */}
       <div className="bg-white border-b border-zinc-200 p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
@@ -209,7 +209,7 @@ DIRECTRICES:
       </div>
 
       {/* Main Area */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-40">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         {/* API Key Wizard */}
         {showKeyInput && (
           <div className="max-w-xl mx-auto bg-white rounded-2xl border border-zinc-200 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
@@ -289,7 +289,7 @@ DIRECTRICES:
         )}
 
         {/* Chat Messages */}
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-6 w-full">
           {messages.map((msg, i) => (
             <div
               key={i}
@@ -338,8 +338,8 @@ DIRECTRICES:
       </div>
 
       {/* Input Area */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-zinc-50 via-zinc-50 to-transparent">
-        <div className="max-w-4xl mx-auto flex gap-3">
+      <div className="p-4 md:p-6 bg-white border-t border-zinc-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <div className="max-w-6xl mx-auto flex gap-3 w-full">
           <div className="flex-1 relative group">
             <input
               type="text"

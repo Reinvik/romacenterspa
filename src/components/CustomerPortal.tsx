@@ -74,7 +74,7 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
   if (reminder && !ticket) {
     return (
       <div className="min-h-screen bg-zinc-50 flex flex-col items-center py-8 px-4 font-sans">
-        <div className="w-full max-w-2xl">
+        <div className="w-full max-w-4xl">
            <div className="text-center mb-10">
             <div className="w-20 h-20 rounded-2xl mx-auto mb-4 border border-zinc-200 shadow-inner flex items-center justify-center bg-black">
               <img src="/logo3.png" alt="Roma Center SPA" className="w-16 h-16 object-contain" />
@@ -182,7 +182,7 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
 
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col items-center py-4 px-4 font-sans">
-      <div className="w-full max-w-3xl">
+      <div className="w-full max-w-6xl">
         {/* Banner del Taller Optimizado */}
         <div className="bg-white rounded-3xl shadow-sm border border-zinc-100 p-4 mb-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">

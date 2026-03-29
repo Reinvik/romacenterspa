@@ -105,36 +105,37 @@ export function OperationsManual({ themeColor = '#10b981' }: OperationsManualPro
       className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500"
     >
       {/* Header with Download */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-8 bg-white border border-zinc-200 rounded-[2.5rem] shadow-sm">
-        <div className="flex items-center gap-5">
-          <div className="p-4 rounded-3xl" style={{ backgroundColor: `${themeColor}15`, color: themeColor }}>
-            <ScrollText className="w-10 h-10" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 md:p-10 bg-white border border-zinc-200 rounded-3xl md:rounded-[2.5rem] shadow-sm overflow-hidden relative group/header">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-zinc-50 rounded-full -mr-16 -mt-16 group-hover/header:scale-150 transition-transform duration-700 ease-out" />
+        <div className="flex items-center gap-4 md:gap-6 relative z-10">
+          <div className="p-3 md:p-5 rounded-2xl md:rounded-3xl shrink-0" style={{ backgroundColor: `${themeColor}15`, color: themeColor }}>
+            <ScrollText className="w-8 h-8 md:w-12 md:h-12" />
           </div>
           <div>
-            <h2 className="text-3xl font-black text-zinc-900 tracking-tighter">Manual de Operaciones</h2>
-            <p className="text-zinc-500 font-medium">Excelencia Clínica y Estándares Roma Center</p>
+            <h2 className="text-2xl md:text-4xl font-black text-zinc-900 tracking-tighter leading-tight">Manual de Operaciones</h2>
+            <p className="text-sm md:text-lg text-zinc-500 font-medium">Excelencia Clínica y Estándares Roma Center</p>
           </div>
         </div>
         <button 
           onClick={handleDownloadPDF}
-          className="flex items-center justify-center gap-2 px-8 py-4 bg-zinc-900 hover:bg-zinc-800 text-white rounded-[2rem] font-bold transition-all shadow-xl active:scale-95 group"
+          className="flex items-center justify-center gap-3 px-6 md:px-10 py-3 md:py-5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-2xl md:rounded-[2rem] font-bold transition-all shadow-xl active:scale-95 group relative z-10 w-full md:w-auto overflow-hidden"
         >
-          <FileDown className="w-6 h-6 group-hover:scale-110 transition-transform" />
-          Descargar Manual PDF
+          <FileDown className="w-5 h-5 md:w-6 md:h-6 group-hover:scale-110 transition-transform" />
+          <span className="text-sm md:text-base">Descargar Manual PDF</span>
         </button>
       </div>
 
       {/* Objetivo */}
-      <div className="p-10 bg-zinc-900 text-white rounded-[3rem] shadow-2xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:scale-110 transition-transform duration-1000">
-          <Target className="w-64 h-64" />
+      <div className="p-6 md:p-12 bg-zinc-900 text-white rounded-3xl md:rounded-[3rem] shadow-2xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 p-6 md:p-12 opacity-5 md:opacity-10 group-hover:scale-110 transition-transform duration-1000">
+          <Target className="w-32 h-32 md:w-64 md:h-64" />
         </div>
-        <div className="relative z-10 space-y-4">
-          <div className="flex items-center gap-3 text-zinc-400 font-bold uppercase tracking-[0.2em] text-[10px]">
-            <div className="w-12 h-[1px]" style={{ backgroundColor: themeColor }}></div>
+        <div className="relative z-10 space-y-6">
+          <div className="flex items-center gap-3 text-zinc-400 font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs">
+            <div className="w-8 md:w-16 h-[1px]" style={{ backgroundColor: themeColor }}></div>
             Visión Institucional
           </div>
-          <p className="text-2xl md:text-3xl font-light leading-tight max-w-4xl">
+          <p className="text-xl md:text-4xl font-light leading-snug max-w-5xl">
             Nuestra meta es <span className="text-zinc-400 font-normal">eliminar la incertidumbre</span> y utilizar la plataforma 
             <span className="font-bold mx-2" style={{ color: themeColor }}>Nexus Garage</span> para respaldar cada diagnóstico. 
             Somos especialistas técnicos con <span className="italic">excelencia clínica</span>.
@@ -177,7 +178,7 @@ export function OperationsManual({ themeColor = '#10b981' }: OperationsManualPro
             <ShieldAlert className="w-6 h-6" />
             Líneas Rojas
           </h3>
-          <div className="bg-red-50 border border-red-100 rounded-[2.5rem] p-8 space-y-6">
+          <div className="bg-red-50 border border-red-100 rounded-3xl md:rounded-[2.5rem] p-6 md:p-10 space-y-6">
             <RedLineItem label="Efecto Tragedia" text="Prohibido resoplar o adelantar diagnósticos costosos sin haber revisado con detención." />
             <RedLineItem label="Jerga Incomprensible" text="Si el cliente no entiende la reparación, el valor del servicio se pierde por completo." />
             <RedLineItem label="Entrega en Silencio" text="Cerrar el ciclo es vital. Explicar el trabajo realizado es el 50% de la venta." />
@@ -187,21 +188,21 @@ export function OperationsManual({ themeColor = '#10b981' }: OperationsManualPro
         </div>
       </div>
 
-      {/* Protocolos de Atención */}
-      <div className="space-y-8 pt-8">
-        <h3 className="text-3xl font-black text-zinc-900 text-center tracking-tighter">Protocolos de Atención</h3>
+    {/* Protocolos de Atención */}
+      <div className="space-y-8 pt-8 px-2 md:px-0">
+        <h3 className="text-2xl md:text-3xl font-black text-zinc-900 text-center tracking-tighter">Protocolos de Atención</h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
           {/* Estándar */}
-          <div className="bg-white border border-zinc-200 rounded-[3rem] overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500 group">
-            <div className="p-10 bg-zinc-50 border-b border-zinc-200 group-hover:bg-white transition-colors">
+          <div className="bg-white border border-zinc-200 rounded-3xl md:rounded-[3rem] overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500 group">
+            <div className="p-6 md:p-10 bg-zinc-50 border-b border-zinc-200 group-hover:bg-white transition-colors">
               <div className="flex items-center gap-4 mb-3">
-                <Wrench className="w-8 h-8 text-zinc-900" />
-                <span className="font-black text-2xl tracking-tighter uppercase">Atención Estándar</span>
+                <Wrench className="w-6 h-6 md:w-8 md:h-8 text-zinc-900" />
+                <span className="font-black text-xl md:text-2xl tracking-tighter uppercase">Atención Estándar</span>
               </div>
-              <p className="text-zinc-500 font-medium leading-relaxed">Reparaciones generales o diagnósticos complejos.</p>
+              <p className="text-sm md:text-base text-zinc-500 font-medium leading-relaxed">Reparaciones generales o diagnósticos complejos.</p>
             </div>
-            <div className="p-10 space-y-10">
+            <div className="p-6 md:p-10 space-y-8 md:space-y-12">
               <ProtocolStep 
                 num="1" 
                 title="El Ingreso" 
@@ -224,18 +225,18 @@ export function OperationsManual({ themeColor = '#10b981' }: OperationsManualPro
           </div>
 
           {/* Pit Stop */}
-          <div className="bg-white border border-zinc-200 rounded-[3rem] overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500 group">
-            <div className="p-10 group-hover:bg-white transition-colors" style={{ backgroundColor: `${themeColor}05`, borderBottom: `1px solid ${themeColor}15` }}>
+          <div className="bg-white border border-zinc-200 rounded-3xl md:rounded-[3rem] overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500 group">
+            <div className="p-6 md:p-10 group-hover:bg-white transition-colors" style={{ backgroundColor: `${themeColor}05`, borderBottom: `1px solid ${themeColor}15` }}>
               <div className="flex items-center gap-4 mb-3">
-                <Clock className="w-8 h-8" style={{ color: themeColor }} />
-                <span className="font-black text-2xl tracking-tighter uppercase">Protocolo Pit Stop</span>
+                <Clock className="w-6 h-6 md:w-8 md:h-8" style={{ color: themeColor }} />
+                <span className="font-black text-xl md:text-2xl tracking-tighter uppercase">Protocolo Pit Stop</span>
               </div>
-              <p className="text-zinc-500 font-medium leading-relaxed">Servicios rápidos (30-60 min). Alta rotación.</p>
+              <p className="text-sm md:text-base text-zinc-500 font-medium leading-relaxed">Servicios rápidos (30-60 min). Alta rotación.</p>
             </div>
-            <div className="p-10 space-y-10">
-              <div className="p-5 rounded-3xl flex items-center gap-4" style={{ backgroundColor: `${themeColor}10`, border: `1px solid ${themeColor}20` }}>
-                <Monitor className="w-7 h-7 shrink-0" style={{ color: themeColor }} />
-                <p className="text-sm font-black leading-tight">REGLA CERO: Monitor visible con Kanban de Nexus Garage siempre activo.</p>
+            <div className="p-6 md:p-10 space-y-8 md:space-y-12">
+              <div className="p-4 md:p-6 rounded-2xl md:rounded-3xl flex items-center gap-4" style={{ backgroundColor: `${themeColor}10`, border: `1px solid ${themeColor}20` }}>
+                <Monitor className="w-5 h-5 md:w-8 md:h-8 shrink-0" style={{ color: themeColor }} />
+                <p className="text-xs md:text-base font-black leading-tight">REGLA CERO: Monitor visible con Kanban de Nexus Garage siempre activo.</p>
               </div>
               <ProtocolStep 
                 num="1" 
@@ -265,13 +266,14 @@ export function OperationsManual({ themeColor = '#10b981' }: OperationsManualPro
 
 function RuleCard({ icon, title, description, themeColor }: { icon: React.ReactNode, title: string, description: string, themeColor: string }) {
   return (
-    <div className="p-6 bg-white border border-zinc-200 rounded-[2.5rem] flex gap-5 hover:border-zinc-300 hover:shadow-lg transition-all group">
-      <div className="shrink-0 p-4 rounded-3xl bg-zinc-50 group-hover:scale-110 transition-transform" style={{ color: themeColor }}>
+    <div className="p-5 md:p-8 bg-white border border-zinc-200 rounded-3xl md:rounded-[2.5rem] flex items-start md:items-center gap-4 md:gap-6 hover:border-zinc-300 hover:shadow-xl transition-all group overflow-hidden relative">
+      <div className="absolute top-0 right-0 w-24 h-24 bg-zinc-50 rounded-full -mr-12 -mt-12 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="shrink-0 p-3 md:p-5 rounded-2xl md:rounded-3xl bg-zinc-50 group-hover:scale-110 transition-transform relative z-10" style={{ color: themeColor }}>
         {icon}
       </div>
-      <div className="space-y-1 mt-1">
-        <h4 className="font-bold text-lg text-zinc-900 tracking-tight">{title}</h4>
-        <p className="text-sm text-zinc-500 leading-relaxed font-medium">{description}</p>
+      <div className="space-y-1 relative z-10">
+        <h4 className="font-bold text-base md:text-xl text-zinc-900 tracking-tight">{title}</h4>
+        <p className="text-xs md:text-sm text-zinc-500 leading-relaxed font-medium">{description}</p>
       </div>
     </div>
   );
@@ -293,18 +295,21 @@ function RedLineItem({ label, text }: { label: string, text: string }) {
 
 function ProtocolStep({ num, title, quote, action }: { num: string, title: string, quote: string, action: string }) {
   return (
-    <div className="flex gap-6">
-      <div className="shrink-0 w-10 h-10 rounded-2xl bg-zinc-900 text-white flex items-center justify-center font-black text-lg shadow-lg">
+    <div className="flex gap-4 md:gap-8">
+      <div className="shrink-0 w-8 h-8 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-zinc-900 text-white flex items-center justify-center font-black text-base md:text-xl shadow-lg">
         {num}
       </div>
-      <div className="space-y-4 pt-1">
-        <h4 className="font-black text-zinc-900 uppercase tracking-tighter text-sm">{title}</h4>
-        <div className="bg-zinc-50 p-6 rounded-[1.5rem] border border-zinc-100 border-l-4 border-l-zinc-300 italic text-sm text-zinc-600 leading-relaxed">
+      <div className="space-y-4 pt-1 flex-1">
+        <h4 className="font-black text-zinc-900 uppercase tracking-tighter text-xs md:text-sm">{title}</h4>
+        <div className="bg-zinc-50 p-4 md:p-8 rounded-2xl md:rounded-[2rem] border border-zinc-100 border-l-4 border-l-zinc-300 italic text-xs md:text-base text-zinc-600 leading-relaxed relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+            <Scroll className="w-12 h-12 md:w-20 md:h-20" />
+          </div>
           "{quote}"
         </div>
-        <div className="flex items-center gap-3 text-xs font-black text-zinc-400">
-          <ArrowRight className="w-4 h-4 shrink-0" />
-          <span className="uppercase tracking-widest">{action}</span>
+        <div className="flex items-center gap-2 md:gap-3 text-[10px] md:text-xs font-black text-zinc-400">
+          <ArrowRight className="w-3 h-3 md:w-4 md:h-4 shrink-0" style={{ color: '#10b981' }} />
+          <span className="uppercase tracking-[0.15em] md:tracking-widest">{action}</span>
         </div>
       </div>
     </div>
