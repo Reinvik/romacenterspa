@@ -66,6 +66,8 @@ export interface Ticket {
   created_at?: string;
   payment_method?: PaymentMethod;
   document_type?: DocumentType;
+  customer_rating?: number;    // 1–5 estrellas (solo el día de creación)
+  customer_feedback?: string;  // Comentario escrito del cliente
 }
 
 export interface Mechanic {

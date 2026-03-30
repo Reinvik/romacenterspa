@@ -1,6 +1,6 @@
 import React from 'react';
 import { Mechanic, Ticket, TicketStatus } from '../types';
-import { Wrench, UserMinus, Plus, UserCircle, Car, CheckCircle2, Clock, AlertTriangle, TrendingUp, BarChart3, DollarSign, ArrowUpRight, ArrowDownRight, Calendar, UserX } from 'lucide-react';
+import { Wrench, UserMinus, Plus, UserCircle, Car, CheckCircle2, Clock, AlertTriangle, TrendingUp, BarChart3, DollarSign, ArrowUpRight, ArrowDownRight, Calendar, UserX, Star } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format, isSameDay, isSameMonth, parseISO, subDays, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -115,7 +115,21 @@ export function Mechanics({ mechanics, tickets, onAdd, onDelete, onUpdateTicket 
             completed: completedInPeriod.length,
             revenue: revenueInPeriod,
             workload: workloadPercentage,
-            list: activeTickets.slice(0, 3)
+            list: activeTickets.slice(0, 3),
+            feedbackTickets: mechanicTickets.filter(t => t.customer_rating != null),
+            avgRating:
+                mechanicTickets.filter(t => t.customer_rating != null).length > 0
+                    ? Math.round(
+                        (mechanicTickets
+                            .filter(t => t.customer_rating != null)
+                            .reduce((sum, t) => sum + (t.customer_rating || 0), 0) /
+                            mechanicTickets.filter(t => t.customer_rating != null).length) * 10
+                    ) / 10
+                    : null,
+            latestFeedback: mechanicTickets
+                .filter(t => t.customer_rating != null && t.customer_feedback)
+                .sort((a, b) => (b.entry_date > a.entry_date ? 1 : -1))
+                .slice(0, 3),
         };
     };
 
@@ -373,13 +387,61 @@ export function Mechanics({ mechanics, tickets, onAdd, onDelete, onUpdateTicket 
                                 </div>
                             </div>
 
-                            {/* Footer KPI Score */}
-                            <div className="p-4 bg-zinc-50 rounded-b-3xl border-t border-zinc-100 flex items-center justify-between">
-                                <span className="text-xs font-bold text-zinc-500">SCORE DE RENDIMIENTO</span>
-                                <div className="flex items-center gap-1.5 text-emerald-600 font-black">
-                                    <TrendingUp className="w-4 h-4" />
-                                    {stats.total > 0 ? Math.round((stats.completed / (stats.total || 1)) * 100) : 0}%
+                            {/* Footer KPI Score + Ratings */}
+                            <div className="p-4 bg-zinc-50 rounded-b-3xl border-t border-zinc-100">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-xs font-bold text-zinc-500">SCORE DE RENDIMIENTO</span>
+                                    <div className="flex items-center gap-1.5 text-emerald-600 font-black">
+                                        <TrendingUp className="w-4 h-4" />
+                                        {stats.total > 0 ? Math.round((stats.completed / (stats.total || 1)) * 100) : 0}%
+                                    </div>
                                 </div>
+
+                                {/* Valoraciones del Cliente */}
+                                {stats.avgRating !== null && (
+                                    <div className="border-t border-zinc-200/60 pt-3">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Valoración Clientes</span>
+                                            <div className="flex items-center gap-1">
+                                                <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                                                <span className="text-sm font-black text-zinc-900">{stats.avgRating}</span>
+                                                <span className="text-[10px] text-zinc-400 font-bold">/ 5</span>
+                                                <span className="text-[10px] text-zinc-400 ml-1">({stats.feedbackTickets.length} reseñas)</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Barra de estrellas */}
+                                        <div className="flex gap-0.5 mb-3">
+                                            {[1,2,3,4,5].map(s => (
+                                                <Star
+                                                    key={s}
+                                                    className={cn(
+                                                        'w-4 h-4',
+                                                        s <= Math.round(stats.avgRating!) ? 'text-amber-400 fill-amber-400' : 'text-zinc-200 fill-zinc-200'
+                                                    )}
+                                                />
+                                            ))}
+                                        </div>
+
+                                        {/* Últimas reseñas */}
+                                        {stats.latestFeedback.length > 0 && (
+                                            <div className="space-y-2">
+                                                {stats.latestFeedback.map((t, i) => (
+                                                    <div key={i} className="bg-white rounded-xl px-3 py-2 border border-zinc-100 flex items-start gap-2">
+                                                        <div className="flex gap-0.5 mt-0.5 shrink-0">
+                                                            {[1,2,3,4,5].map(s => (
+                                                                <Star key={s} className={cn('w-2.5 h-2.5', s <= (t.customer_rating || 0) ? 'text-amber-400 fill-amber-400' : 'text-zinc-200 fill-zinc-200')} />
+                                                            ))}
+                                                        </div>
+                                                        <p className="text-[10px] text-zinc-500 leading-relaxed italic">
+                                                            "{t.customer_feedback}"
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     );

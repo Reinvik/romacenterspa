@@ -74,7 +74,8 @@ export default function App() {
     searchTicketsHistory,
     fetchCompanies, addIntelligentReminder, fetchActiveReminder, fetchPublicSettingsBySlug, fetchOccupiedReminders, fetchPublicVehicleInfo,
     addReminder, deleteReminder, updateReminder, refreshData, uploadTicketPhoto,
-    salaVentas, addSalaVenta, fetchSalaVentas
+    salaVentas, addSalaVenta, fetchSalaVentas,
+    saveCustomerFeedback
   } = useGarageStore(profile?.company_id);
 
   // Monitor Mode Auto-refresh
@@ -230,6 +231,7 @@ export default function App() {
         onBack={handleBackToLogin}
         onAcceptQuotation={acceptQuotation}
         onRefresh={handleRefreshPortal}
+        onSaveFeedback={saveCustomerFeedback}
       />
     );
   }

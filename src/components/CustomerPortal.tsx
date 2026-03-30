@@ -1,8 +1,8 @@
 import React from 'react';
 import { Ticket, TicketStatus, GarageSettings, Reminder } from '../types';
-import { parseISO, format } from 'date-fns';
+import { parseISO, format, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Car, Clock, ArrowLeft, CheckCircle2, Wrench, Package, AlertCircle, MapPin, Camera, Image as ImageIcon, Calendar, Phone, RotateCw, History } from 'lucide-react';
+import { Car, Clock, ArrowLeft, CheckCircle2, Wrench, Package, AlertCircle, MapPin, Camera, Image as ImageIcon, Calendar, Phone, RotateCw, History, Star, Send, MessageSquare } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface CustomerPortalProps {
@@ -13,12 +13,18 @@ interface CustomerPortalProps {
   onBack: () => void;
   onAcceptQuotation: (id: string, model: string) => Promise<void>;
   onRefresh?: () => Promise<void>;
+  onSaveFeedback?: (ticketId: string, rating: number, feedback: string) => Promise<void>;
 }
 
-export function CustomerPortal({ ticket, allTickets = [], reminder, settings, onBack, onAcceptQuotation, onRefresh }: CustomerPortalProps) {
+export function CustomerPortal({ ticket, allTickets = [], reminder, settings, onBack, onAcceptQuotation, onRefresh, onSaveFeedback }: CustomerPortalProps) {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [logoError, setLogoError] = React.useState(false);
+  const [feedbackRating, setFeedbackRating] = React.useState(0);
+  const [feedbackHover, setFeedbackHover] = React.useState(0);
+  const [feedbackText, setFeedbackText] = React.useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = React.useState(false);
+  const [feedbackSaved, setFeedbackSaved] = React.useState(false);
 
   const primaryColor = settings?.theme_menu_highlight || '#D6A621';
 
@@ -457,7 +463,119 @@ export function CustomerPortal({ ticket, allTickets = [], reminder, settings, on
           </div>
         </div>
 
-        {/* Historial de Reportes Antiguos Expandido */}
+        {/* ─── SECCIÓN DE FEEDBACK DEL CLIENTE ─── */}
+        {(() => {
+          const ticketDate = displayTicket.entry_date ? parseISO(displayTicket.entry_date) : null;
+          const isCreationDay = ticketDate ? isToday(ticketDate) : false;
+          const alreadyRated = displayTicket.customer_rating != null;
+
+          // Si ya está guardado en esta sesión o ya existía rating
+          if (feedbackSaved || alreadyRated) {
+            const rating = feedbackSaved ? feedbackRating : displayTicket.customer_rating!;
+            const comment = feedbackSaved ? feedbackText : displayTicket.customer_feedback;
+            return (
+              <div className="mt-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200/50 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                  </div>
+                  <h3 className="font-bold text-zinc-900 text-sm uppercase tracking-tight">Tu Opinión</h3>
+                </div>
+                <div className="flex gap-1 mb-3">
+                  {[1,2,3,4,5].map(s => (
+                    <Star key={s} className={cn('w-7 h-7', s <= rating ? 'text-amber-400 fill-amber-400' : 'text-zinc-200 fill-zinc-200')} />
+                  ))}
+                </div>
+                {comment && (
+                  <p className="text-sm text-zinc-600 italic leading-relaxed bg-white/60 px-4 py-3 rounded-xl border border-amber-100">
+                    "{comment}"
+                  </p>
+                )}
+                <p className="text-xs text-emerald-600 font-bold mt-3 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4" /> Gracias por tu opinión
+                </p>
+              </div>
+            );
+          }
+
+          if (!isCreationDay) {
+            return null; // No mostrar nada si no es el día de creación y no hay rating
+          }
+
+          return (
+            <div className="mt-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200/50 p-6">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+                  <MessageSquare className="w-4 h-4 text-amber-500" />
+                </div>
+                <h3 className="font-bold text-zinc-900 text-sm uppercase tracking-tight">¿Cómo fue tu atención?</h3>
+              </div>
+              <p className="text-xs text-zinc-500 mb-5">Tu opinión nos ayuda a mejorar. Solo disponible hoy.</p>
+
+              {/* Estrellas Interactivas */}
+              <div className="flex gap-2 mb-5">
+                {[1,2,3,4,5].map(star => (
+                  <button
+                    key={star}
+                    type="button"
+                    onMouseEnter={() => setFeedbackHover(star)}
+                    onMouseLeave={() => setFeedbackHover(0)}
+                    onClick={() => setFeedbackRating(star)}
+                    className="transition-transform hover:scale-110 active:scale-95"
+                  >
+                    <Star
+                      className={cn(
+                        'w-9 h-9 transition-colors',
+                        (feedbackHover || feedbackRating) >= star
+                          ? 'text-amber-400 fill-amber-400'
+                          : 'text-zinc-200 fill-zinc-200'
+                      )}
+                    />
+                  </button>
+                ))}
+              </div>
+
+              {/* Texto del comentario */}
+              <textarea
+                rows={3}
+                placeholder="Cuéntanos tu experiencia (opcional)..."
+                className="w-full px-4 py-3 text-sm rounded-xl border border-amber-200 bg-white/70 focus:outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-400/10 resize-none font-medium text-zinc-700 mb-4 transition-all"
+                value={feedbackText}
+                onChange={e => setFeedbackText(e.target.value)}
+              />
+
+              {/* Botón Enviar */}
+              <button
+                type="button"
+                disabled={feedbackRating === 0 || feedbackSubmitting}
+                onClick={async () => {
+                  if (!feedbackRating || !onSaveFeedback) return;
+                  setFeedbackSubmitting(true);
+                  try {
+                    await onSaveFeedback(displayTicket.id, feedbackRating, feedbackText);
+                    setFeedbackSaved(true);
+                  } catch (e) {
+                    console.error('Error saving feedback:', e);
+                  } finally {
+                    setFeedbackSubmitting(false);
+                  }
+                }}
+                className={cn(
+                  'flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-black uppercase tracking-wider transition-all active:scale-95',
+                  feedbackRating > 0
+                    ? 'bg-amber-400 hover:bg-amber-500 text-white shadow-lg shadow-amber-200'
+                    : 'bg-zinc-100 text-zinc-400 cursor-not-allowed'
+                )}
+              >
+                {feedbackSubmitting ? (
+                  <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Enviando...</>
+                ) : (
+                  <><Send className="w-4 h-4" /> Enviar Opinión</>
+                )}
+              </button>
+            </div>
+          );
+        })()}
         {sortedTickets.length > 1 && (
           <div className="mt-12 space-y-8">
             <h3 className="text-xl font-black text-zinc-900 uppercase tracking-widest flex items-center gap-3 px-2">

@@ -1069,6 +1069,28 @@ export function useGarageStore(companyId?: string) {
     }
   }, [companyId, parts, fetchSalaVentas, fetchData]);
 
+  /**
+   * Guarda el feedback del cliente (rating 1-5 + comentario) en Supabase.
+   * No requiere autenticación: el cliente accede vía link público.
+   * Solo se debe llamar el mismo día de creación del ticket (restricción en UI).
+   */
+  const saveCustomerFeedback = async (ticketId: string, rating: number, feedback: string) => {
+    const { error } = await supabase
+      .from('romaspa_tickets')
+      .update({
+        customer_rating: rating,
+        customer_feedback: feedback || null,
+      })
+      .eq('id', ticketId);
+
+    if (error) throw error;
+
+    // Actualizar localmente para reflejar inmediatamente sin refetch
+    setTickets(prev =>
+      prev.map(t => t.id === ticketId ? { ...t, customer_rating: rating, customer_feedback: feedback } : t)
+    );
+  };
+
   return {
     tickets,
     mechanics,
@@ -1079,6 +1101,7 @@ export function useGarageStore(companyId?: string) {
     notifications,
     loading,
     salaVentas,
+    // ─── Feedback del cliente ─────────────────────────────────────────
     addTicket,
     updateTicketStatus,
     addMechanic,
@@ -1112,6 +1135,7 @@ export function useGarageStore(companyId?: string) {
     fetchOccupiedReminders,
     fetchPublicVehicleInfo,
     fetchSalaVentas,
-    addSalaVenta
+    addSalaVenta,
+    saveCustomerFeedback
   };
 }
