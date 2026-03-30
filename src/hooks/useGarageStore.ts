@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Ticket, TicketStatus, Mechanic, Part, Customer, GarageSettings, Reminder, GarageNotification, SalaVenta, SalaVentaItem, PaymentMethod, DocumentType } from '../types';
+import { Ticket, TicketStatus, Mechanic, Part, Customer, GarageSettings, Reminder, GarageNotification, SalaVenta, SalaVentaItem, PaymentMethod, DocumentType, Garantia } from '../types';
 import { supabase, supabaseGarage } from '../lib/supabase';
 
 export const TIME_SLOTS = [
@@ -18,6 +18,7 @@ export function useGarageStore(companyId?: string) {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<GarageSettings | null>(null);
   const [salaVentas, setSalaVentas] = useState<SalaVenta[]>([]);
+  const [garantias, setGarantias] = useState<Garantia[]>([]);
 
   const fetchData = useCallback(async (isSilent = false) => {
     if (!companyId) return;
@@ -55,9 +56,10 @@ export function useGarageStore(companyId?: string) {
         mechanicsData,
         partsData,
         customersData,
-        { data: settingsData },
+        settingsResponse,
         remindersData,
-        { data: notificationsData }
+        notificationsResponse,
+        garantiasData
       ] = await Promise.all([
         fetchAll('romaspa_tickets', 'entry_date', false),
         supabaseGarage.from('romaspa_mechanics').select('*').eq('company_id', companyId).order('name', { ascending: true }).then(r => r.data),
@@ -65,7 +67,8 @@ export function useGarageStore(companyId?: string) {
         fetchAll('romaspa_customers', 'name', true),
         supabaseGarage.from('romaspa_settings').select('*').eq('company_id', companyId).maybeSingle(),
         supabaseGarage.from('romaspa_reminders').select('*').eq('company_id', companyId).order('planned_date', { ascending: true }).then(r => r.data),
-        supabaseGarage.from('romaspa_notifications').select('*').eq('company_id', companyId).order('created_at', { ascending: false }).limit(20)
+        supabaseGarage.from('romaspa_notifications').select('*').eq('company_id', companyId).order('created_at', { ascending: false }).limit(20),
+        fetchAll('romaspa_garantias', 'fecha', false)
       ]);
 
       // Map mechanic names to tickets if mechanic_id is present and mechanicsData is available
@@ -91,13 +94,15 @@ export function useGarageStore(companyId?: string) {
       if (customersData) setCustomers(customersData as Customer[]);
       
       // Enriquecer settings con el slug de la compañía
+      const settingsData = settingsResponse?.data;
       if (settingsData) {
         const { data: companyData } = await supabase.from('companies').select('slug').eq('id', settingsData.company_id).single();
         setSettings({ ...settingsData, company_slug: companyData?.slug } as GarageSettings);
       }
       
       if (remindersData) setReminders(remindersData as Reminder[]);
-      if (notificationsData) setNotifications(notificationsData as GarageNotification[]);
+      if (notificationsResponse?.data) setNotifications(notificationsResponse.data as GarageNotification[]);
+      if (garantiasData) setGarantias(garantiasData as Garantia[]);
     } catch (error) {
       console.error('Error fetching garage data:', error);
     } finally {
@@ -244,7 +249,7 @@ export function useGarageStore(companyId?: string) {
     }
   }, [companyId, fetchData]);
 
-  const updateTicketStatus = useCallback(async (ticketId: string, status: TicketStatus, changedBy: string = 'Recepción/Admin', paymentMethod?: PaymentMethod, documentType?: DocumentType) => {
+  const updateTicketStatus = useCallback(async (ticketId: string, status: TicketStatus, changedBy: string = 'Recepción/Admin', paymentMethod?: PaymentMethod, documentType?: DocumentType, rutEmpresa?: string, razonSocial?: string) => {
     const now = new Date().toISOString();
     let originalTicket: Ticket | undefined;
 
@@ -269,7 +274,9 @@ export function useGarageStore(companyId?: string) {
           last_status_change: now,
           close_date: (status === 'Finalizado' || status === 'Entregado') ? originalTicket?.entry_date || now : null,
           payment_method: paymentMethod,
-          document_type: documentType
+          document_type: documentType,
+          rut_empresa: rutEmpresa || null,
+          razon_social: razonSocial || null
         })
         .eq('id', ticketId);
 
@@ -485,6 +492,9 @@ export function useGarageStore(companyId?: string) {
       if (updates.spare_parts !== undefined) dbUpdates.spare_parts = updates.spare_parts;
       if (updates.cost !== undefined) dbUpdates.cost = updates.cost;
       if (updates.payment_method !== undefined) dbUpdates.payment_method = updates.payment_method;
+      if (updates.document_type !== undefined) dbUpdates.document_type = updates.document_type;
+      if (updates.rut_empresa !== undefined) dbUpdates.rut_empresa = updates.rut_empresa;
+      if (updates.razon_social !== undefined) dbUpdates.razon_social = updates.razon_social;
 
       if (updates.mechanic_id !== undefined) {
         dbUpdates.mechanic = updates.mechanic_id === 'Sin asignar' ? null : updates.mechanic_id;
@@ -1034,7 +1044,7 @@ export function useGarageStore(companyId?: string) {
     }
   }, [companyId]);
 
-  const addSalaVenta = useCallback(async (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, notes?: string) => {
+  const addSalaVenta = useCallback(async (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, rutEmpresa?: string, razonSocial?: string, notes?: string) => {
     if (!companyId) return;
     const total = items.reduce((acc, i) => acc + i.subtotal, 0);
     try {
@@ -1045,6 +1055,8 @@ export function useGarageStore(companyId?: string) {
         total,
         payment_method: paymentMethod,
         document_type: documentType,
+        rut_empresa: rutEmpresa || null,
+        razon_social: razonSocial || null,
         notes: notes || null,
         sold_at: new Date().toISOString()
       }]);
@@ -1136,6 +1148,32 @@ export function useGarageStore(companyId?: string) {
     fetchPublicVehicleInfo,
     fetchSalaVentas,
     addSalaVenta,
-    saveCustomerFeedback
+    saveCustomerFeedback,
+    // ─── Garantías ──────────────────────────────────────────────────
+    garantias,
+    addGarantia: async (garantia: Partial<Garantia>) => {
+      try {
+        const { error } = await supabaseGarage.from('romaspa_garantias').insert([{
+          ...garantia,
+          company_id: companyId,
+          created_at: new Date().toISOString()
+        }]);
+        if (error) throw error;
+        await fetchData();
+      } catch (error) {
+        console.error('Error adding garantia:', error);
+        throw error;
+      }
+    },
+    deleteGarantia: async (id: string) => {
+      try {
+        const { error } = await supabaseGarage.from('romaspa_garantias').delete().eq('id', id);
+        if (error) throw error;
+        await fetchData();
+      } catch (error) {
+        console.error('Error deleting garantia:', error);
+        throw error;
+      }
+    }
   };
 }

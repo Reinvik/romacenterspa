@@ -144,6 +144,13 @@ export function VehicleHistoryView({ ticket, settings }: VehicleHistoryViewProps
                   <p className="text-[11px] text-zinc-600 line-clamp-3 italic bg-zinc-50/30 p-2 rounded-lg border border-dashed border-zinc-100">
                     {displayNotes || 'Sin notas adicionales'}
                   </p>
+
+                  {(ticket.rut_empresa || ticket.razon_social) && (
+                    <div className="mt-2 text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1.5 rounded-lg border border-indigo-100 inline-flex flex-col gap-0.5">
+                      {ticket.rut_empresa && <div className="font-medium"><span className="font-black">RUT Factura:</span> {ticket.rut_empresa}</div>}
+                      {ticket.razon_social && <div className="font-medium"><span className="font-black">Razón Social:</span> {ticket.razon_social}</div>}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

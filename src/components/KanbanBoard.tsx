@@ -38,7 +38,7 @@ import { FinishTicketModal } from './FinishTicketModal';
 interface KanbanBoardProps {
   tickets: Ticket[];
   mechanics: Mechanic[];
-  onUpdateStatus: (id: string, status: TicketStatus, changedBy?: string, paymentMethod?: PaymentMethod, documentType?: DocumentType) => void;
+  onUpdateStatus: (id: string, status: TicketStatus, changedBy?: string, paymentMethod?: PaymentMethod, documentType?: DocumentType, rutEmpresa?: string, razonSocial?: string) => void;
   onShowHistory?: (ticket: Ticket) => void;
   onShowCRM?: (ticket: Ticket) => void;
   onEditTicket: (ticket: Ticket) => void;
@@ -544,9 +544,9 @@ export function KanbanBoard({
 
       <FinishTicketModal
         isOpen={!!finishConfirmPending}
-        onConfirm={(method, documentType) => {
+        onConfirm={(method, documentType, rutEmpresa, razonSocial) => {
           if (finishConfirmPending) {
-            onUpdateStatus(finishConfirmPending.id, 'Finalizado', finishConfirmPending.action, method, documentType);
+            onUpdateStatus(finishConfirmPending.id, 'Finalizado', finishConfirmPending.action, method, documentType, rutEmpresa, razonSocial);
             setFinishConfirmPending(null);
           }
         }}

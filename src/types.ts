@@ -68,6 +68,8 @@ export interface Ticket {
   document_type?: DocumentType;
   customer_rating?: number;    // 1–5 estrellas (solo el día de creación)
   customer_feedback?: string;  // Comentario escrito del cliente
+  rut_empresa?: string;
+  razon_social?: string;
 }
 
 export interface Mechanic {
@@ -157,6 +159,8 @@ export interface SalaVenta {
   document_type: DocumentType;
   sold_at: string; // ISO string
   created_at: string; // ISO string
+  rut_empresa?: string;
+  razon_social?: string;
 }
 
 export interface Profile {
@@ -167,4 +171,16 @@ export interface Profile {
   company_id: string;
   is_blocked: boolean;
   created_at?: string;
+}
+
+export interface Garantia {
+  id: string;
+  company_id: string;
+  fecha: string; // ISO string
+  patente: string;
+  nombre: string | null;
+  detalle: string | null;
+  monto: number;
+  comentarios: string | null;
+  created_at: string;
 }

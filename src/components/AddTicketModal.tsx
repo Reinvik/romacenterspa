@@ -29,6 +29,8 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
     mileage: 0,
     entry_date: format(new Date(), 'yyyy-MM-dd'),
     spare_parts: [] as ServiceItem[],
+    rut_empresa: '',
+    razon_social: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,6 +58,8 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
         mileage: 0,
         entry_date: format(new Date(), 'yyyy-MM-dd'),
         spare_parts: [],
+        rut_empresa: '',
+        razon_social: '',
       });
       setCustomerSearch('');
       setIsCustomerFilled(false);
@@ -482,6 +486,29 @@ export function AddTicketModal({ isOpen, onClose, onAdd, mechanics, customers, t
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">RUT Empresa (Opcional Factura)</label>
+              <input
+                type="text"
+                placeholder="Ej. 76.123.456-1"
+                className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none transition-all bg-zinc-50/30 focus:ring-4 font-bold"
+                value={formData.rut_empresa}
+                onChange={e => setFormData({ ...formData, rut_empresa: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Razón Social (Opcional Factura)</label>
+              <input
+                type="text"
+                placeholder="Ej. Empresa SpA"
+                className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none transition-all bg-zinc-50/30 focus:ring-4 font-bold"
+                value={formData.razon_social}
+                onChange={e => setFormData({ ...formData, razon_social: e.target.value })}
+              />
             </div>
           </div>
 

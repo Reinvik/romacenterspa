@@ -13,7 +13,7 @@ import { cn } from '../lib/utils';
 interface SalaVentasProps {
   parts: Part[];
   tickets: Ticket[];
-  onAddSalaVenta: (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, notes?: string) => Promise<void>;
+  onAddSalaVenta: (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, rutEmpresa?: string, razonSocial?: string, notes?: string) => Promise<void>;
   fetchSalaVentas: (days?: number) => Promise<SalaVenta[]>;
   salaVentas: SalaVenta[];
   settings: GarageSettings | null;
@@ -33,6 +33,8 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
   const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d'>('today');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Tarjeta');
   const [documentType, setDocumentType] = useState<DocumentType>('Boleta');
+  const [rutEmpresa, setRutEmpresa] = useState('');
+  const [razonSocial, setRazonSocial] = useState('');
 
   useEffect(() => {
     fetchSalaVentas(30);
@@ -86,9 +88,11 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
         precio_unitario: c.part.price,
         subtotal: c.part.price * c.cantidad
       }));
-      await onAddSalaVenta(items, paymentMethod, documentType, notes || undefined);
+      await onAddSalaVenta(items, paymentMethod, documentType, rutEmpresa || undefined, razonSocial || undefined, notes || undefined);
       setCart([]);
       setNotes('');
+      setRutEmpresa('');
+      setRazonSocial('');
       setSuccessMsg(`✅ Venta de $${cartTotal.toLocaleString()} registrada`);
       setTimeout(() => setSuccessMsg(''), 3500);
       await fetchSalaVentas(30);
@@ -132,6 +136,8 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
       payment_method: v.payment_method,
       notes: v.notes,
       items: v.items,
+      rut_empresa: v.rut_empresa,
+      razon_social: v.razon_social,
       ticketData: undefined
     }));
     
@@ -161,6 +167,8 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
           payment_method: t.payment_method,
           notes: t.vehicle_notes || t.notes,
           items: undefined,
+          rut_empresa: t.rut_empresa,
+          razon_social: t.razon_social,
           ticketData: t
         };
       });
@@ -396,6 +404,35 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
                 ))}
               </div>
             </div>
+
+            {/* Business Info for Factura */}
+            {documentType === 'Factura' && (
+              <div className="space-y-3 pt-3 border-t border-zinc-200 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pl-1">RUT Empresa</label>
+                    <input
+                      type="text"
+                      value={rutEmpresa}
+                      onChange={e => setRutEmpresa(e.target.value)}
+                      placeholder="12.345.678-9"
+                      className="w-full text-sm px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 uppercase"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pl-1">Razón Social</label>
+                    <input
+                      type="text"
+                      value={razonSocial}
+                      onChange={e => setRazonSocial(e.target.value)}
+                      placeholder="Empresa S.A."
+                      className="w-full text-sm px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 uppercase"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Total</p>
@@ -462,6 +499,19 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
                         )}
                         
                         {item.notes && <p className="text-xs text-zinc-500 italic mt-1 truncate">{item.notes}</p>}
+                        
+                        {(item.rut_empresa || item.razon_social) && (
+                          <div className="mt-1.5 p-1.5 bg-zinc-800/50 rounded-lg border border-zinc-800 flex flex-col gap-0.5">
+                            {item.rut_empresa && <div className="text-[9px] font-black text-zinc-400 flex items-center gap-1.5">
+                              <span className="text-[8px] text-zinc-600 font-black uppercase tracking-tight">RUT:</span>
+                              {item.rut_empresa}
+                            </div>}
+                            {item.razon_social && <div className="text-[9px] font-black text-zinc-400 flex items-center gap-1.5">
+                              <span className="text-[8px] text-zinc-600 font-black uppercase tracking-tight">Social:</span>
+                              <span className="truncate">{item.razon_social}</span>
+                            </div>}
+                          </div>
+                        )}
                       </div>
                       <div className="text-right flex flex-col items-end">
                         <div className={`text-sm font-black whitespace-nowrap ${item.type === 'venta' ? 'text-emerald-400' : 'text-blue-400'}`}>

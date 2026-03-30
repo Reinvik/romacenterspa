@@ -27,6 +27,8 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     const [uploading, setUploading] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<'Tarjeta' | 'Efectivo'>('Tarjeta');
+    const [rutEmpresa, setRutEmpresa] = useState('');
+    const [razonSocial, setRazonSocial] = useState('');
 
     // Search state for spare parts
     const [partSearch, setPartSearch] = useState('');
@@ -56,6 +58,8 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                 ...savedServices.filter(s => s.part_id).map(s => s.part_id!)
             ];
             setPaymentMethod(ticket.payment_method || 'Tarjeta');
+            setRutEmpresa(ticket.rut_empresa || '');
+            setRazonSocial(ticket.razon_social || '');
         }
     }, [ticket]);
 
@@ -153,6 +157,8 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                 services: [],
                 spare_parts: spareParts,
                 payment_method: paymentMethod,
+                rut_empresa: rutEmpresa,
+                razon_social: razonSocial,
             });
 
             // Deduct stock for newly-added inventory parts (both in parts and services)
@@ -432,6 +438,31 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                     <option key={m.id} value={m.id}>{m.name.toUpperCase()}</option>
                                 ))}
                             </select>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1">RUT Empresa (Opcional Factura)</label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej. 76.123.456-1"
+                                    className="w-full px-4 py-3 rounded-2xl border-2 border-zinc-100 focus:border-blue-500 outline-none transition-all font-bold text-zinc-800 bg-white disabled:opacity-50"
+                                    value={rutEmpresa}
+                                    onChange={e => setRutEmpresa(e.target.value)}
+                                    disabled={isFinalized}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest pl-1">Razón Social (Opcional Factura)</label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej. Empresa SpA"
+                                    className="w-full px-4 py-3 rounded-2xl border-2 border-zinc-100 focus:border-blue-500 outline-none transition-all font-bold text-zinc-800 bg-white disabled:opacity-50"
+                                    value={razonSocial}
+                                    onChange={e => setRazonSocial(e.target.value)}
+                                    disabled={isFinalized}
+                                />
+                            </div>
                         </div>
 
                         {/* Evidencia Fotográfica */}

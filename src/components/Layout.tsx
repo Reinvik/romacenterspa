@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Wrench, Package, Users, Settings, LogOut, Bell, Calendar, Menu, X, BarChart3, Search, CalendarCheck, Plus, RefreshCw, ShoppingCart, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Wrench, Package, Users, Settings, LogOut, Bell, Calendar, Menu, X, BarChart3, Search, CalendarCheck, Plus, RefreshCw, ShoppingCart, Sparkles, ShieldCheck } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -54,6 +54,7 @@ export function Layout({
     { id: 'dashboard', label: 'Tablero Kanban', icon: LayoutDashboard },
     { id: 'sales', label: 'Informe de Ventas', icon: BarChart3 },
     { id: 'sala_ventas', label: 'Sala Ventas', icon: ShoppingCart },
+    { id: 'garantias', label: 'Garantías', icon: ShieldCheck },
     { id: 'inventory', label: 'Inventario', icon: Package },
     { id: 'customers', label: 'Clientes', icon: Users },
     { id: 'mechanics', label: 'Mecánicos', icon: Wrench },

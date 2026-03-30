@@ -625,6 +625,12 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
                             </td>
                             <td className="px-6 py-4">
                                 <div className="text-sm text-zinc-700 font-medium">{sale.owner_name}</div>
+                                {((sale as any).rut_empresa || (sale as any).razon_social) && (
+                                  <div className="flex flex-col gap-0.5 mt-1">
+                                    {(sale as any).rut_empresa && <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-tight">RUT: {(sale as any).rut_empresa}</span>}
+                                    {(sale as any).razon_social && <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-tight">Social: {(sale as any).razon_social}</span>}
+                                  </div>
+                                )}
                             </td>
                             <td className="px-6 py-4">
                                 <div className="text-xs text-zinc-500 flex items-center gap-1.5 font-bold">

@@ -23,6 +23,7 @@ import { LandingPage } from './components/LandingPage';
 import { Sales } from './components/Sales';
 import { SalaVentas } from './components/SalaVentas';
 import { AIConsultant } from './components/AIConsultant';
+import { Garantias } from './components/Garantias';
 
 type ViewState = 'landing' | 'login' | 'customer' | 'dashboard';
 
@@ -75,7 +76,7 @@ export default function App() {
     fetchCompanies, addIntelligentReminder, fetchActiveReminder, fetchPublicSettingsBySlug, fetchOccupiedReminders, fetchPublicVehicleInfo,
     addReminder, deleteReminder, updateReminder, refreshData, uploadTicketPhoto,
     salaVentas, addSalaVenta, fetchSalaVentas,
-    saveCustomerFeedback
+    saveCustomerFeedback, garantias, addGarantia, deleteGarantia
   } = useGarageStore(profile?.company_id);
 
   // Monitor Mode Auto-refresh
@@ -297,6 +298,15 @@ export default function App() {
           onAddSalaVenta={addSalaVenta}
           fetchSalaVentas={fetchSalaVentas}
           salaVentas={salaVentas}
+          settings={settings}
+        />
+      )}
+
+      {activeTab === 'garantias' && (
+        <Garantias
+          garantias={garantias}
+          onAdd={addGarantia}
+          onDelete={deleteGarantia}
           settings={settings}
         />
       )}
