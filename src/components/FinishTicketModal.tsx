@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { CheckCircle2, CreditCard, Banknote, FileText, Check } from 'lucide-react';
+import { CheckCircle2, CreditCard, Banknote, FileText, Check, Send } from 'lucide-react';
 import { PaymentMethod, DocumentType } from '../types';
 
 interface FinishTicketModalProps {
   isOpen: boolean;
-  onConfirm: (paymentMethod: PaymentMethod, documentType: DocumentType, rutEmpresa?: string, razonSocial?: string) => void;
+  onConfirm: (paymentMethod: PaymentMethod, documentType: DocumentType, rutEmpresa?: string, razonSocial?: string, transferData?: string) => void;
   onCancel: () => void;
 }
 
@@ -13,6 +13,7 @@ export function FinishTicketModal({ isOpen, onConfirm, onCancel }: FinishTicketM
   const [documentType, setDocumentType] = useState<DocumentType>('Boleta');
   const [rutEmpresa, setRutEmpresa] = useState('');
   const [razonSocial, setRazonSocial] = useState('');
+  const [transferData, setTransferData] = useState('');
 
   if (!isOpen) return null;
 
@@ -60,7 +61,32 @@ export function FinishTicketModal({ isOpen, onConfirm, onCancel }: FinishTicketM
                 <CreditCard className="w-4 h-4" />
                 <span className="font-black text-xs uppercase tracking-wider">Tarjeta</span>
               </button>
+
+              <button
+                onClick={() => setPaymentMethod('Transferencia')}
+                className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all col-span-2 ${
+                  paymentMethod === 'Transferencia' 
+                    ? 'bg-purple-50 border-purple-500 shadow-sm' 
+                    : 'bg-white border-zinc-100 text-zinc-400 hover:border-zinc-200'
+                }`}
+              >
+                <Send className="w-4 h-4" />
+                <span className="font-black text-xs uppercase tracking-wider">Transferencia</span>
+              </button>
             </div>
+
+            {/* Transfer Details */}
+            {paymentMethod === 'Transferencia' && (
+              <div className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block px-1">Datos de Transferencia</label>
+                <textarea
+                  value={transferData}
+                  onChange={(e) => setTransferData(e.target.value)}
+                  placeholder="Ej: Banco Estado, Op: 123456"
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 text-zinc-900 font-bold placeholder:text-zinc-300 transition-all resize-none h-20"
+                />
+              </div>
+            )}
 
             {/* Document Type Selection (Boleta/Factura) */}
             <div className="pt-2">
@@ -130,7 +156,7 @@ export function FinishTicketModal({ isOpen, onConfirm, onCancel }: FinishTicketM
             Cancelar
           </button>
           <button 
-            onClick={() => onConfirm(paymentMethod, documentType, rutEmpresa || undefined, razonSocial || undefined)} 
+            onClick={() => onConfirm(paymentMethod, documentType, rutEmpresa || undefined, razonSocial || undefined, transferData || undefined)} 
             className="flex-[1.5] px-4 py-3.5 text-xs font-black text-white bg-zinc-900 hover:bg-black rounded-2xl transition-all shadow-lg uppercase tracking-widest active:scale-95"
           >
             Confirmar y Cerrar

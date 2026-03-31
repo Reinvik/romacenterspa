@@ -249,7 +249,7 @@ export function useGarageStore(companyId?: string) {
     }
   }, [companyId, fetchData]);
 
-  const updateTicketStatus = useCallback(async (ticketId: string, status: TicketStatus, changedBy: string = 'Recepción/Admin', paymentMethod?: PaymentMethod, documentType?: DocumentType, rutEmpresa?: string, razonSocial?: string) => {
+  const updateTicketStatus = useCallback(async (ticketId: string, status: TicketStatus, changedBy: string = 'Recepción/Admin', paymentMethod?: PaymentMethod, documentType?: DocumentType, rutEmpresa?: string, razonSocial?: string, transferData?: string) => {
     const now = new Date().toISOString();
     let originalTicket: Ticket | undefined;
 
@@ -276,7 +276,8 @@ export function useGarageStore(companyId?: string) {
           payment_method: paymentMethod,
           document_type: documentType,
           rut_empresa: rutEmpresa || null,
-          razon_social: razonSocial || null
+          razon_social: razonSocial || null,
+          transfer_data: transferData || null
         })
         .eq('id', ticketId);
 
@@ -495,6 +496,7 @@ export function useGarageStore(companyId?: string) {
       if (updates.document_type !== undefined) dbUpdates.document_type = updates.document_type;
       if (updates.rut_empresa !== undefined) dbUpdates.rut_empresa = updates.rut_empresa;
       if (updates.razon_social !== undefined) dbUpdates.razon_social = updates.razon_social;
+      if (updates.transfer_data !== undefined) dbUpdates.transfer_data = updates.transfer_data;
 
       if (updates.mechanic_id !== undefined) {
         dbUpdates.mechanic = updates.mechanic_id === 'Sin asignar' ? null : updates.mechanic_id;
@@ -1044,7 +1046,7 @@ export function useGarageStore(companyId?: string) {
     }
   }, [companyId]);
 
-  const addSalaVenta = useCallback(async (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, rutEmpresa?: string, razonSocial?: string, notes?: string) => {
+  const addSalaVenta = useCallback(async (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, rutEmpresa?: string, razonSocial?: string, notes?: string, transferData?: string) => {
     if (!companyId) return;
     const total = items.reduce((acc, i) => acc + i.subtotal, 0);
     try {
@@ -1058,6 +1060,7 @@ export function useGarageStore(companyId?: string) {
         rut_empresa: rutEmpresa || null,
         razon_social: razonSocial || null,
         notes: notes || null,
+        transfer_data: transferData || null,
         sold_at: new Date().toISOString()
       }]);
       if (error) throw error;

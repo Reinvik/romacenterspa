@@ -13,7 +13,7 @@ import { cn } from '../lib/utils';
 interface SalaVentasProps {
   parts: Part[];
   tickets: Ticket[];
-  onAddSalaVenta: (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, rutEmpresa?: string, razonSocial?: string, notes?: string) => Promise<void>;
+  onAddSalaVenta: (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, rutEmpresa?: string, razonSocial?: string, notes?: string, transferData?: string) => Promise<void>;
   fetchSalaVentas: (days?: number) => Promise<SalaVenta[]>;
   salaVentas: SalaVenta[];
   settings: GarageSettings | null;
@@ -30,11 +30,12 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
   const [notes, setNotes] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
-  const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d'>('today');
+  const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d' | 'facturas'>('today');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Tarjeta');
   const [documentType, setDocumentType] = useState<DocumentType>('Boleta');
   const [rutEmpresa, setRutEmpresa] = useState('');
   const [razonSocial, setRazonSocial] = useState('');
+  const [transferData, setTransferData] = useState('');
 
   useEffect(() => {
     fetchSalaVentas(30);
@@ -88,11 +89,12 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
         precio_unitario: c.part.price,
         subtotal: c.part.price * c.cantidad
       }));
-      await onAddSalaVenta(items, paymentMethod, documentType, rutEmpresa || undefined, razonSocial || undefined, notes || undefined);
+      await onAddSalaVenta(items, paymentMethod, documentType, rutEmpresa || undefined, razonSocial || undefined, notes || undefined, transferData || undefined);
       setCart([]);
       setNotes('');
       setRutEmpresa('');
       setRazonSocial('');
+      setTransferData('');
       setSuccessMsg(`✅ Venta de $${cartTotal.toLocaleString()} registrada`);
       setTimeout(() => setSuccessMsg(''), 3500);
       await fetchSalaVentas(30);
@@ -139,6 +141,7 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
       rut_empresa: v.rut_empresa,
       razon_social: v.razon_social,
       document_type: v.document_type,
+      transfer_data: v.transfer_data,
       ticketData: undefined
     }));
     
@@ -171,6 +174,7 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
           rut_empresa: t.rut_empresa,
           razon_social: t.razon_social,
           document_type: (t.rut_empresa || t.razon_social) ? 'Factura' : 'Boleta',
+          transfer_data: t.transfer_data,
           ticketData: t
         };
       });
@@ -184,6 +188,12 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
     return combined.filter(item => {
       const d = safeParseDate(item.date);
       
+      if (timeRange === 'facturas') {
+        const dayStr = format(d, 'yyyy-MM-dd');
+        const todayStr = format(now, 'yyyy-MM-dd');
+        return dayStr === todayStr && item.document_type === 'Factura';
+      }
+
       if (timeRange === 'today') {
         const dayStr = format(d, 'yyyy-MM-dd');
         const todayStr = format(now, 'yyyy-MM-dd');
@@ -195,14 +205,15 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
     });
   }, [salaVentas, tickets, timeRange]);
 
-  const { totalPeriod, cashTotal, cardTotal } = useMemo(() => {
+  const { totalPeriod, cashTotal, cardTotal, transferTotal } = useMemo(() => {
     return filteredHistory.reduce((acc, item) => {
       const amount = item.total || 0;
       acc.totalPeriod += amount;
       if (item.payment_method === 'Efectivo') acc.cashTotal += amount;
-      else acc.cardTotal += amount;
+      else if (item.payment_method === 'Tarjeta') acc.cardTotal += amount;
+      else if (item.payment_method === 'Transferencia') acc.transferTotal += amount;
       return acc;
-    }, { totalPeriod: 0, cashTotal: 0, cardTotal: 0 });
+    }, { totalPeriod: 0, cashTotal: 0, cardTotal: 0, transferTotal: 0 });
   }, [filteredHistory]);
 
   const labelRange = { today: 'Hoy', '7d': '7 días', '30d': '30 días' }[timeRange];
@@ -222,14 +233,19 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
           </h2>
           <p className="text-zinc-500 mt-1 font-medium">Venta directa de productos sin registro de cliente.</p>
         </div>
-        <div className="flex gap-2">
-          {(['today', '7d', '30d'] as const).map(r => (
+        <div className="flex flex-wrap gap-2">
+          {(['today', 'facturas', '7d', '30d'] as const).map(r => (
             <button
               key={r}
               onClick={() => setTimeRange(r)}
-              className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${timeRange === r ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-500 border border-zinc-200 hover:bg-zinc-50'}`}
+              className={cn(
+                "px-4 py-1.5 text-xs font-bold rounded-lg transition-all border",
+                timeRange === r 
+                  ? r === 'facturas' ? 'bg-amber-500 border-amber-500 text-white shadow-lg' : 'bg-zinc-900 border-zinc-900 text-white shadow-lg'
+                  : "bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50"
+              )}
             >
-              {labelRange === r ? labelRange : { today: 'Hoy', '7d': '7 Días', '30d': '30 Días' }[r]}
+              {r === 'facturas' ? 'Facturas hoy' : { today: 'Hoy', '7d': '7 Días', '30d': '30 Días' }[r]}
             </button>
           ))}
         </div>
@@ -371,12 +387,12 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
             
             <div className="flex flex-col gap-2">
               <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pl-1">Método de Pago</label>
-              <div className="grid grid-cols-2 gap-2">
-                {(['Efectivo', 'Tarjeta'] as const).map(m => (
+              <div className="grid grid-cols-3 gap-2">
+                {(['Efectivo', 'Tarjeta', 'Transferencia'] as const).map(m => (
                   <button
                     key={m}
                     onClick={() => setPaymentMethod(m)}
-                    className={`py-2 text-xs font-bold rounded-xl border transition-all ${
+                    className={`py-2 text-[10px] font-bold rounded-xl border transition-all ${
                       paymentMethod === m 
                         ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' 
                         : 'bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300'
@@ -387,6 +403,19 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
                 ))}
               </div>
             </div>
+
+            {paymentMethod === 'Transferencia' && (
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pl-1">Datos de Transferencia</label>
+                <input
+                  type="text"
+                  value={transferData}
+                  onChange={e => setTransferData(e.target.value)}
+                  placeholder="Ej: Banco Estado, Op: 123456"
+                  className="w-full text-sm px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                />
+              </div>
+            )}
 
             <div className="flex flex-col gap-2">
               <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pl-1">Tipo de Documento</label>
@@ -523,10 +552,17 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
                           "text-[9px] font-black uppercase tracking-tighter mt-1 px-2 py-0.5 rounded-md border italic",
                           item.payment_method === 'Efectivo' 
                             ? "bg-amber-500/10 text-amber-400 border-amber-500/20" 
-                            : "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                            : item.payment_method === 'Transferencia'
+                            ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                            : "bg-blue-500/10 text-blue-400 border-blue-500/20"
                         )}>
                           {item.payment_method || 'Tarjeta'}
                         </div>
+                        {item.transfer_data && (
+                          <div className="text-[8px] text-zinc-500 mt-1 max-w-[120px] truncate">
+                            {item.transfer_data}
+                          </div>
+                        )}
                         {item.document_type === 'Factura' && (
                           <div className="text-[9px] font-black uppercase tracking-tighter mt-1 px-2 py-0.5 rounded-md border bg-red-500/10 text-red-500 border-red-500/20">
                             Factura
@@ -558,12 +594,19 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
                 </div>
                 <p className="text-sm font-black text-zinc-200">${cashTotal.toLocaleString()}</p>
               </div>
-              <div className="space-y-1 text-right">
-                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight flex items-center gap-1.5 justify-end font-mono">
+              <div className="space-y-1 text-center">
+                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight flex items-center gap-1.5 justify-center font-mono">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
                   Tarjeta
-                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
                 </div>
                 <p className="text-sm font-black text-zinc-200">${cardTotal.toLocaleString()}</p>
+              </div>
+              <div className="space-y-1 text-right">
+                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight flex items-center gap-1.5 justify-end font-mono">
+                  Transf.
+                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                </div>
+                <p className="text-sm font-black text-zinc-200">${transferTotal.toLocaleString()}</p>
               </div>
             </div>
           </div>
