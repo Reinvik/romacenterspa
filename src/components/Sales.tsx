@@ -623,43 +623,51 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
                                 <div className="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">{sale.patente || sale.id}</div>
                                 <div className="text-xs text-zinc-500">{sale.model}</div>
                             </td>
-                            <td className="px-6 py-4">
-                                <div className="text-sm text-zinc-700 font-medium">{sale.owner_name}</div>
-                                {((sale as any).rut_empresa || (sale as any).razon_social) && (
-                                  <div className="mt-1.5 p-1.5 bg-zinc-50 rounded-lg border border-zinc-200 flex flex-col gap-0.5 relative">
-                                    <div className="absolute top-1.5 right-1.5 text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20">
-                                        Factura
-                                    </div>
-                                    {(sale as any).rut_empresa && <div className="text-[9px] font-black text-zinc-500 flex items-center gap-1.5">
-                                      <span className="text-[8px] text-zinc-400 font-black uppercase tracking-tight">RUT:</span>
-                                      {(sale as any).rut_empresa}
-                                    </div>}
-                                    {(sale as any).razon_social && <div className="text-[9px] font-black text-zinc-500 flex items-center gap-1.5 pr-12">
-                                      <span className="text-[8px] text-zinc-400 font-black uppercase tracking-tight">Social:</span>
-                                      <span className="truncate">{(sale as any).razon_social}</span>
-                                    </div>}
-                                  </div>
-                                )}
-                            </td>
-                            <td className="px-6 py-4">
-                                <div className="text-xs text-zinc-500 flex items-center gap-1.5 font-bold">
-                                    <Calendar className="w-3.5 h-3.5" />
-                                    {dateStr ? format(parseISO(dateStr), "d 'de' MMM, yyyy", { locale: es }) : 'S/F'}
-                                </div>
-                            </td>
-                             <td className="px-6 py-4 text-right">
-                                 <div className="text-sm font-black text-zinc-900">${getTicketAmount(sale).toLocaleString()}</div>
+                             <td className="px-6 py-4">
+                                 <div className="text-sm text-zinc-700 font-medium">{sale.owner_name}</div>
+                                 {((sale as any).rut_empresa || (sale as any).razon_social) && (
+                                   <div className="mt-1.5 p-1.5 bg-zinc-50 rounded-lg border border-zinc-200 flex flex-col gap-0.5">
+                                     {(sale as any).rut_empresa && <div className="text-[9px] font-black text-zinc-500 flex items-center gap-1.5">
+                                       <span className="text-[8px] text-zinc-400 font-black uppercase tracking-tight">RUT:</span>
+                                       {(sale as any).rut_empresa}
+                                     </div>}
+                                     {(sale as any).razon_social && <div className="text-[9px] font-black text-zinc-500 flex items-center gap-1.5">
+                                       <span className="text-[8px] text-zinc-400 font-black uppercase tracking-tight">SOCIAL:</span>
+                                       <span className="truncate">{(sale as any).razon_social}</span>
+                                     </div>}
+                                   </div>
+                                 )}
                              </td>
-                             <td className="px-6 py-4 text-center">
+                             <td className="px-6 py-4">
+                                 <div className="text-xs text-zinc-500 flex items-center gap-1.5 font-bold">
+                                     <Calendar className="w-3.5 h-3.5" />
+                                     {dateStr ? format(parseISO(dateStr), "d 'de' MMM, yyyy", { locale: es }) : 'S/F'}
+                                 </div>
+                             </td>
+                              <td className="px-6 py-4 text-right">
+                                  <div className="text-sm font-black text-zinc-900">${getTicketAmount(sale).toLocaleString()}</div>
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                  <div className="flex flex-col items-center gap-1">
                                     <span className={cn(
-                                        "text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-md border italic",
+                                        "text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-md border italic w-full text-center",
                                         sale.payment_method === 'Efectivo' 
                                             ? "bg-amber-500/10 text-amber-400 border-amber-500/20" 
                                             : "bg-purple-500/10 text-purple-400 border-purple-500/20"
                                     )}>
                                         {sale.payment_method || 'Tarjeta'}
                                     </span>
-                             </td>
+                                    {((sale as any).rut_empresa || (sale as any).razon_social) ? (
+                                      <span className="text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-md border bg-red-500/10 text-red-500 border-red-500/20 w-full text-center">
+                                        Factura
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-md border bg-zinc-500/10 text-zinc-500 border-zinc-500/20 w-full text-center">
+                                        Boleta
+                                      </span>
+                                    )}
+                                  </div>
+                              </td>
                         </tr>
                       );
                     })}

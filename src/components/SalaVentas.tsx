@@ -138,6 +138,7 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
       items: v.items,
       rut_empresa: v.rut_empresa,
       razon_social: v.razon_social,
+      document_type: v.document_type,
       ticketData: undefined
     }));
     
@@ -169,6 +170,7 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
           items: undefined,
           rut_empresa: t.rut_empresa,
           razon_social: t.razon_social,
+          document_type: (t.rut_empresa || t.razon_social) ? 'Factura' : 'Boleta',
           ticketData: t
         };
       });
@@ -501,16 +503,13 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
                         {item.notes && <p className="text-xs text-zinc-500 italic mt-1 truncate">{item.notes}</p>}
                         
                         {(item.rut_empresa || item.razon_social) && (
-                          <div className="mt-1.5 p-1.5 bg-zinc-800/50 rounded-lg border border-zinc-800 flex flex-col gap-0.5 relative">
-                            <div className="absolute top-1.5 right-1.5 text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20">
-                                Factura
-                            </div>
+                          <div className="mt-1.5 p-1.5 bg-zinc-800/30 rounded-lg border border-zinc-800/50 flex flex-col gap-0.5">
                             {item.rut_empresa && <div className="text-[9px] font-black text-zinc-400 flex items-center gap-1.5">
                               <span className="text-[8px] text-zinc-600 font-black uppercase tracking-tight">RUT:</span>
                               {item.rut_empresa}
                             </div>}
-                            {item.razon_social && <div className="text-[9px] font-black text-zinc-400 flex items-center gap-1.5 pr-12">
-                              <span className="text-[8px] text-zinc-600 font-black uppercase tracking-tight">Social:</span>
+                            {item.razon_social && <div className="text-[9px] font-black text-zinc-400 flex items-center gap-1.5">
+                              <span className="text-[8px] text-zinc-600 font-black uppercase tracking-tight">SOCIAL:</span>
                               <span className="truncate">{item.razon_social}</span>
                             </div>}
                           </div>
@@ -528,6 +527,16 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
                         )}>
                           {item.payment_method || 'Tarjeta'}
                         </div>
+                        {item.document_type === 'Factura' && (
+                          <div className="text-[9px] font-black uppercase tracking-tighter mt-1 px-2 py-0.5 rounded-md border bg-red-500/10 text-red-500 border-red-500/20">
+                            Factura
+                          </div>
+                        )}
+                        {item.document_type === 'Boleta' && (
+                          <div className="text-[9px] font-black uppercase tracking-tighter mt-1 px-2 py-0.5 rounded-md border bg-zinc-500/10 text-zinc-500 border-zinc-500/20">
+                            Boleta
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
