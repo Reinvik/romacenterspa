@@ -76,7 +76,7 @@ export default function App() {
     fetchCompanies, addIntelligentReminder, fetchActiveReminder, fetchPublicSettingsBySlug, fetchOccupiedReminders, fetchPublicVehicleInfo,
     addReminder, deleteReminder, updateReminder, refreshData, uploadTicketPhoto,
     salaVentas, addSalaVenta, fetchSalaVentas,
-    saveCustomerFeedback, garantias, addGarantia, deleteGarantia
+    saveCustomerFeedback, garantias, addGarantia, updateGarantia, deleteGarantia
   } = useGarageStore(profile?.company_id);
 
   // Monitor Mode Auto-refresh
@@ -306,6 +306,7 @@ export default function App() {
         <Garantias
           garantias={garantias}
           onAdd={addGarantia}
+          onUpdate={updateGarantia}
           onDelete={deleteGarantia}
           settings={settings}
         />

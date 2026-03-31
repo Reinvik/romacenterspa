@@ -1151,6 +1151,16 @@ export function useGarageStore(companyId?: string) {
     saveCustomerFeedback,
     // ─── Garantías ──────────────────────────────────────────────────
     garantias,
+    updateGarantia: async (id: string, updates: Partial<Garantia>) => {
+      try {
+        const { error } = await supabaseGarage.from('romaspa_garantias').update(updates).eq('id', id);
+        if (error) throw error;
+        await fetchData();
+      } catch (error) {
+        console.error('Error updating garantia:', error);
+        throw error;
+      }
+    },
     addGarantia: async (garantia: Partial<Garantia>) => {
       try {
         const { error } = await supabaseGarage.from('romaspa_garantias').insert([{

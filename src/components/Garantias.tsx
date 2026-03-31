@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Plus, Search, Trash2 } from 'lucide-react';
+import { ShieldCheck, Plus, Search, Trash2, Edit2 } from 'lucide-react';
 import { Garantia, GarageSettings } from '../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -8,13 +8,15 @@ import { AddGarantiaModal } from './AddGarantiaModal';
 interface GarantiasProps {
   garantias: Garantia[];
   onAdd: (garantia: Partial<Garantia>) => Promise<void>;
+  onUpdate: (id: string, updates: Partial<Garantia>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   settings: GarageSettings | null;
 }
 
-export function Garantias({ garantias, onAdd, onDelete, settings }: GarantiasProps) {
+export function Garantias({ garantias, onAdd, onUpdate, onDelete, settings }: GarantiasProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingGarantia, setEditingGarantia] = useState<Garantia | null>(null);
 
   const filteredGarantias = garantias.filter(g => 
     g.patente.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -37,7 +39,10 @@ export function Garantias({ garantias, onAdd, onDelete, settings }: GarantiasPro
           Garantías y Abonos
         </h2>
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => {
+            setEditingGarantia(null);
+            setIsAddModalOpen(true);
+          }}
           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors w-full sm:w-auto justify-center font-medium shadow-sm"
         >
           <Plus className="w-5 h-5" />
@@ -101,17 +106,29 @@ export function Garantias({ garantias, onAdd, onDelete, settings }: GarantiasPro
                       {garantia.comentarios || '-'}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => {
-                          if (window.confirm('¿Estás seguro de que deseas eliminar este registro?')) {
-                            onDelete(garantia.id);
-                          }
-                        }}
-                        className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Eliminar registro"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingGarantia(garantia);
+                            setIsAddModalOpen(true);
+                          }}
+                          className="p-1.5 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Editar registro"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm('¿Estás seguro de que deseas eliminar este registro?')) {
+                              onDelete(garantia.id);
+                            }
+                          }}
+                          className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Eliminar registro"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -123,8 +140,13 @@ export function Garantias({ garantias, onAdd, onDelete, settings }: GarantiasPro
 
       <AddGarantiaModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditingGarantia(null);
+        }}
         onAdd={onAdd}
+        onUpdate={onUpdate}
+        initialData={editingGarantia}
       />
     </div>
   );

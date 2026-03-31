@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Save, AlertCircle } from 'lucide-react';
 import { Garantia } from '../types';
 import { format } from 'date-fns';
@@ -7,9 +7,11 @@ interface AddGarantiaModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (garantia: Partial<Garantia>) => Promise<void>;
+  onUpdate?: (id: string, updates: Partial<Garantia>) => Promise<void>;
+  initialData?: Garantia | null;
 }
 
-export function AddGarantiaModal({ isOpen, onClose, onAdd }: AddGarantiaModalProps) {
+export function AddGarantiaModal({ isOpen, onClose, onAdd, onUpdate, initialData }: AddGarantiaModalProps) {
   const [formData, setFormData] = useState<Partial<Garantia>>({
     fecha: format(new Date(), 'yyyy-MM-dd'),
     patente: '',
@@ -20,6 +22,27 @@ export function AddGarantiaModal({ isOpen, onClose, onAdd }: AddGarantiaModalPro
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        setFormData({
+          ...initialData,
+          fecha: initialData.fecha ? format(new Date(initialData.fecha), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
+        });
+      } else {
+        setFormData({
+          fecha: format(new Date(), 'yyyy-MM-dd'),
+          patente: '',
+          nombre: '',
+          detalle: '',
+          monto: 0,
+          comentarios: ''
+        });
+      }
+      setError(null);
+    }
+  }, [isOpen, initialData]);
 
   if (!isOpen) return null;
 
@@ -34,18 +57,17 @@ export function AddGarantiaModal({ isOpen, onClose, onAdd }: AddGarantiaModalPro
 
     try {
       setIsSubmitting(true);
-      await onAdd({
-        ...formData,
-        patente: formData.patente.toUpperCase()
-      });
-      setFormData({
-        fecha: format(new Date(), 'yyyy-MM-dd'),
-        patente: '',
-        nombre: '',
-        detalle: '',
-        monto: 0,
-        comentarios: ''
-      });
+      if (initialData && initialData.id && onUpdate) {
+        await onUpdate(initialData.id, {
+          ...formData,
+          patente: formData.patente?.toUpperCase()
+        });
+      } else {
+        await onAdd({
+          ...formData,
+          patente: formData.patente?.toUpperCase()
+        });
+      }
       onClose();
     } catch (err: any) {
       setError(err.message || 'Error al guardar el registro');
@@ -58,7 +80,9 @@ export function AddGarantiaModal({ isOpen, onClose, onAdd }: AddGarantiaModalPro
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between p-6 border-b border-zinc-100">
-          <h2 className="text-xl font-bold text-zinc-800">Nueva Garantía / Abono</h2>
+          <h2 className="text-xl font-bold text-zinc-800">
+            {initialData ? 'Editar Garantía / Abono' : 'Nueva Garantía / Abono'}
+          </h2>
           <button onClick={onClose} className="p-2 hover:bg-zinc-100 rounded-xl transition-colors text-zinc-500">
             <X className="w-5 h-5" />
           </button>
