@@ -501,12 +501,15 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
                         {item.notes && <p className="text-xs text-zinc-500 italic mt-1 truncate">{item.notes}</p>}
                         
                         {(item.rut_empresa || item.razon_social) && (
-                          <div className="mt-1.5 p-1.5 bg-zinc-800/50 rounded-lg border border-zinc-800 flex flex-col gap-0.5">
+                          <div className="mt-1.5 p-1.5 bg-zinc-800/50 rounded-lg border border-zinc-800 flex flex-col gap-0.5 relative">
+                            <div className="absolute top-1.5 right-1.5 text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20">
+                                Factura
+                            </div>
                             {item.rut_empresa && <div className="text-[9px] font-black text-zinc-400 flex items-center gap-1.5">
                               <span className="text-[8px] text-zinc-600 font-black uppercase tracking-tight">RUT:</span>
                               {item.rut_empresa}
                             </div>}
-                            {item.razon_social && <div className="text-[9px] font-black text-zinc-400 flex items-center gap-1.5">
+                            {item.razon_social && <div className="text-[9px] font-black text-zinc-400 flex items-center gap-1.5 pr-12">
                               <span className="text-[8px] text-zinc-600 font-black uppercase tracking-tight">Social:</span>
                               <span className="truncate">{item.razon_social}</span>
                             </div>}

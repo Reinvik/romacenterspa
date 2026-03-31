@@ -626,9 +626,18 @@ export function Sales({ tickets, salaVentas, parts = [], settings = null, mechan
                             <td className="px-6 py-4">
                                 <div className="text-sm text-zinc-700 font-medium">{sale.owner_name}</div>
                                 {((sale as any).rut_empresa || (sale as any).razon_social) && (
-                                  <div className="flex flex-col gap-0.5 mt-1">
-                                    {(sale as any).rut_empresa && <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-tight">RUT: {(sale as any).rut_empresa}</span>}
-                                    {(sale as any).razon_social && <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-tight">Social: {(sale as any).razon_social}</span>}
+                                  <div className="mt-1.5 p-1.5 bg-zinc-50 rounded-lg border border-zinc-200 flex flex-col gap-0.5 relative">
+                                    <div className="absolute top-1.5 right-1.5 text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20">
+                                        Factura
+                                    </div>
+                                    {(sale as any).rut_empresa && <div className="text-[9px] font-black text-zinc-500 flex items-center gap-1.5">
+                                      <span className="text-[8px] text-zinc-400 font-black uppercase tracking-tight">RUT:</span>
+                                      {(sale as any).rut_empresa}
+                                    </div>}
+                                    {(sale as any).razon_social && <div className="text-[9px] font-black text-zinc-500 flex items-center gap-1.5 pr-12">
+                                      <span className="text-[8px] text-zinc-400 font-black uppercase tracking-tight">Social:</span>
+                                      <span className="truncate">{(sale as any).razon_social}</span>
+                                    </div>}
                                   </div>
                                 )}
                             </td>
