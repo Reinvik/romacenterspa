@@ -326,14 +326,14 @@ export function KanbanBoard({
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-1 bg-zinc-100 p-0.5 rounded-lg border border-zinc-200">
             <button
-              onClick={() => setZoomLevel(prev => Math.max(0.4, +(prev - 0.1).toFixed(1)))}
+              onClick={() => setZoomLevel(prev => Math.max(0.15, +(prev - 0.05).toFixed(2)))}
               className="px-1.5 py-0.5 hover:bg-white rounded transition-colors text-zinc-600 text-xs font-bold"
             >−</button>
             <span className="text-[9px] font-black font-mono w-8 text-center text-zinc-500 select-none">
               {Math.round(zoomLevel * 100)}%
             </span>
             <button
-              onClick={() => setZoomLevel(prev => Math.min(1, +(prev + 0.1).toFixed(1)))}
+              onClick={() => setZoomLevel(prev => Math.min(1, +(prev + 0.05).toFixed(2)))}
               className="px-1.5 py-0.5 hover:bg-white rounded transition-colors text-zinc-600 text-xs font-bold"
             >+</button>
           </div>
@@ -350,14 +350,14 @@ export function KanbanBoard({
 
       <div className={cn(
         "flex-1 overflow-x-auto relative scrollbar-hide",
-        zoomLevel === 1 && "snap-x snap-mandatory lg:snap-none"
+        zoomLevel >= 0.9 && "snap-x snap-mandatory lg:snap-none"
       )}>
         <div
           className={cn(
             "h-full min-w-max transition-transform duration-300 ease-out origin-top-left",
             zoomLevel !== 1 ? "absolute inset-0" : "flex flex-col relative"
           )}
-          style={zoomLevel !== 1 ? {
+          style={zoomLevel < 1 ? {
             transform: `scale(${zoomLevel})`,
             width: `${(1 / zoomLevel) * 100}%`,
             height: `${(1 / zoomLevel) * 100}%`,
@@ -402,7 +402,10 @@ export function KanbanBoard({
           {/* Columns row */}
           <div className="flex gap-2 lg:gap-3 px-2 lg:px-0 h-full pb-2">
             {/* Agenda column */}
-            <div className="flex-1 min-w-[240px] max-w-[280px] sm:min-w-[200px] bg-amber-50/50 rounded-xl p-2 sm:p-3 flex flex-col border border-amber-200/40 snap-center lg:snap-align-none">
+            <div 
+              style={{ minWidth: zoomLevel < 0.6 ? `${240 * zoomLevel * 1.5}px` : '240px' }}
+              className="flex-1 max-w-[280px] bg-amber-50/50 rounded-xl p-2 sm:p-3 flex flex-col border border-amber-200/40 snap-center lg:snap-align-none"
+            >
               <div className="flex items-center justify-between mb-3 px-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-amber-100 text-amber-800">
@@ -448,7 +451,8 @@ export function KanbanBoard({
                 return (
                   <div
                     key={column.id}
-                    className="flex-1 min-w-[280px] bg-zinc-100/30 rounded-2xl p-3 flex flex-col border border-zinc-200/50 snap-center lg:snap-align-none shadow-sm"
+                    style={{ minWidth: zoomLevel < 0.6 ? `${280 * zoomLevel * 1.5}px` : '280px' }}
+                    className="flex-1 bg-zinc-100/30 rounded-2xl p-3 flex flex-col border border-zinc-200/50 snap-center lg:snap-align-none shadow-sm"
                   >
                     <div className="flex items-center justify-between mb-3 px-1">
                       <div className="flex items-center gap-2">
@@ -503,7 +507,11 @@ export function KanbanBoard({
               return (
                 <div
                   key={column.id}
-                  className="flex-1 min-w-[260px] max-w-[300px] bg-zinc-100/30 rounded-2xl p-4 flex flex-col border border-zinc-200/50 snap-center lg:snap-align-none shadow-sm"
+                  style={{ 
+                    minWidth: zoomLevel < 0.6 ? `${260 * zoomLevel * 1.5}px` : '260px',
+                    maxWidth: zoomLevel < 0.6 ? 'none' : '300px'
+                  }}
+                  className="flex-1 bg-zinc-100/30 rounded-2xl p-4 flex flex-col border border-zinc-200/50 snap-center lg:snap-align-none shadow-sm"
                 >
                   <div className="flex items-center justify-between mb-4 px-1">
                     <div className="flex items-center gap-2">

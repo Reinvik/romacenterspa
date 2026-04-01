@@ -40,6 +40,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
   const [counts, setCounts] = useState({ all: 0, labor: 0, alerts: 0 });
 
   const fetchCounts = async () => {
@@ -214,6 +215,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
         if (error) throw error;
         
         setSelectedIds(new Set());
+        setIsBulkDeleteMode(false); // Salir del modo después de borrar
         reloadData();
       } catch (error) {
         alert('Error al eliminar los repuestos.');
@@ -295,13 +297,31 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
           <h2 className="text-2xl font-bold tracking-tight text-zinc-900">Inventario</h2>
           <p className="text-zinc-500 mt-1">Gestiona el stock de piezas y servicios.</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-all shadow-sm active:scale-95"
-        >
-          <Plus className="w-5 h-5" />
-          Nuevo Item
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setIsBulkDeleteMode(!isBulkDeleteMode);
+              if (isBulkDeleteMode) setSelectedIds(new Set());
+            }}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all shadow-sm active:scale-95",
+              isBulkDeleteMode 
+                ? "bg-amber-100 text-amber-700 border border-amber-200" 
+                : "bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50"
+            )}
+            title={isBulkDeleteMode ? "Cancelar selección" : "Selección múltiple"}
+          >
+            <Trash2 className="w-5 h-5" />
+            <span className="hidden sm:inline">{isBulkDeleteMode ? 'Cancelar' : 'Borrar varios'}</span>
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-all shadow-sm active:scale-95"
+          >
+            <Plus className="w-5 h-5" />
+            Nuevo Item
+          </button>
+        </div>
       </div>
 
       <AddPartModal
@@ -395,14 +415,16 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                      <table className="w-full text-left border-collapse">
                         <thead>
                            <tr className="bg-zinc-50/80 border-b border-zinc-200 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                               <th className="px-6 py-4 w-10">
-                                 <input 
-                                   type="checkbox" 
-                                   className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-                                   checked={selectedIds.size > 0 && selectedIds.size === inventoryParts.length}
-                                   onChange={toggleSelectAll}
-                                 />
-                               </th>
+                               {isBulkDeleteMode && (
+                                 <th className="px-6 py-4 w-10">
+                                   <input 
+                                     type="checkbox" 
+                                     className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                                     checked={selectedIds.size > 0 && selectedIds.size === inventoryParts.length}
+                                     onChange={toggleSelectAll}
+                                   />
+                                 </th>
+                               )}
                               <th className="px-6 py-4">ID / Código</th>
                               <th className="px-6 py-4">Nombre</th>
                               <th className="px-6 py-4 text-center">Ubicación</th>
@@ -431,12 +453,14 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                        <div key={`mob-${part.id}`} className="p-4 space-y-3">
                          <div className="flex justify-between items-start">
                            <div className="flex items-start gap-3">
-                             <input 
-                               type="checkbox" 
-                               className="w-5 h-5 mt-1 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-                               checked={selectedIds.has(part.id)}
-                               onChange={() => toggleSelect(part.id)}
-                             />
+                             {isBulkDeleteMode && (
+                               <input 
+                                 type="checkbox" 
+                                 className="w-5 h-5 mt-1 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                                 checked={selectedIds.has(part.id)}
+                                 onChange={() => toggleSelect(part.id)}
+                               />
+                             )}
                              <div className="flex items-center gap-3">
                                <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
                                  {part.name.toUpperCase().includes('SERVICIO') || part.name.toUpperCase().includes('M.O.') ? <Wrench className="w-4 h-4 text-blue-500" /> : <Package className="w-4 h-4 text-zinc-500" />}
@@ -501,14 +525,16 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                    <table className="w-full text-left border-collapse">
                      <thead>
                        <tr className="bg-zinc-50/80 border-b border-zinc-200 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                          <th className="px-6 py-4 bg-zinc-100/50">
-                            <input 
-                              type="checkbox" 
-                              className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-                              checked={selectedIds.size > 0 && selectedIds.size === inventoryParts.length}
-                              onChange={toggleSelectAll}
-                            />
-                          </th>
+                          {isBulkDeleteMode && (
+                            <th className="px-6 py-4 bg-zinc-100/50">
+                              <input 
+                                type="checkbox" 
+                                className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                                checked={selectedIds.size > 0 && selectedIds.size === inventoryParts.length}
+                                onChange={toggleSelectAll}
+                              />
+                            </th>
+                          )}
                           <th className="px-6 py-4 cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('id')}>
                             <div className="flex items-center">ID / Código <SortIcon field="id" /></div>
                           </th>
@@ -539,14 +565,16 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                              "hover:bg-zinc-50/50 transition-colors group",
                              selectedIds.has(part.id) && "bg-emerald-50/50"
                            )}>
-                             <td className="px-6 py-4">
-                               <input 
-                                 type="checkbox" 
-                                 className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-                                 checked={selectedIds.has(part.id)}
-                                 onChange={() => toggleSelect(part.id)}
-                               />
-                             </td>
+                             {isBulkDeleteMode && (
+                               <td className="px-6 py-4">
+                                 <input 
+                                   type="checkbox" 
+                                   className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                                   checked={selectedIds.has(part.id)}
+                                   onChange={() => toggleSelect(part.id)}
+                                 />
+                               </td>
+                             )}
                              <td className="px-6 py-4">
                                <span className="font-mono text-[10px] font-bold text-zinc-500 bg-zinc-100 px-2 py-1 rounded-md border border-zinc-200">
                                  {part.id}
