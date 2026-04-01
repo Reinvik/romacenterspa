@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Ticket, Mechanic, Part, ServiceItem } from '../types';
-import { X, Save, User, FileText, Loader2, Trash2, PlusCircle, Camera, ImagePlus, History, Search, Package } from 'lucide-react';
+import { X, Save, User, FileText, Loader2, Trash2, PlusCircle, Camera, ImagePlus, History, Search, Package, Send } from 'lucide-react';
 import { VehicleHistoryView } from './VehicleHistoryView';
 import { cn } from '../lib/utils';
 
@@ -26,9 +26,10 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState<'Tarjeta' | 'Efectivo'>('Tarjeta');
+    const [paymentMethod, setPaymentMethod] = useState<'Tarjeta' | 'Efectivo' | 'Transferencia'>('Tarjeta');
     const [rutEmpresa, setRutEmpresa] = useState('');
     const [razonSocial, setRazonSocial] = useState('');
+    const [transferData, setTransferData] = useState('');
 
     // Search state for spare parts
     const [partSearch, setPartSearch] = useState('');
@@ -60,6 +61,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
             setPaymentMethod(ticket.payment_method || 'Tarjeta');
             setRutEmpresa(ticket.rut_empresa || '');
             setRazonSocial(ticket.razon_social || '');
+            setTransferData(ticket.transfer_data || '');
         }
     }, [ticket]);
 
@@ -159,6 +161,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                 payment_method: paymentMethod,
                 rut_empresa: rutEmpresa,
                 razon_social: razonSocial,
+                transfer_data: transferData,
             });
 
             // Deduct stock for newly-added inventory parts (both in parts and services)
@@ -525,22 +528,36 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                                     </div>
 
                                     {/* Método de Pago Selector */}
-                                    <div className="flex items-center gap-1 p-1 bg-zinc-100 rounded-xl w-full sm:w-auto">
-                                        {(['Tarjeta', 'Efectivo'] as const).map((m) => (
-                                            <button
-                                                key={m}
-                                                type="button"
-                                                onClick={() => setPaymentMethod(m)}
-                                                className={cn(
-                                                    "flex-1 sm:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
-                                                    paymentMethod === m 
-                                                        ? "bg-white text-zinc-900 shadow-sm" 
-                                                        : "text-zinc-400 hover:text-zinc-600"
-                                                )}
-                                            >
-                                                {m}
-                                            </button>
-                                        ))}
+                                    <div className="flex flex-col gap-3 w-full sm:w-auto">
+                                        <div className="flex items-center gap-1 p-1 bg-zinc-100 rounded-xl w-full sm:w-auto">
+                                            {(['Tarjeta', 'Efectivo', 'Transferencia'] as const).map((m) => (
+                                                <button
+                                                    key={m}
+                                                    type="button"
+                                                    onClick={() => setPaymentMethod(m)}
+                                                    className={cn(
+                                                        "flex-1 sm:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2",
+                                                        paymentMethod === m 
+                                                            ? "bg-white text-zinc-900 shadow-sm" 
+                                                            : "text-zinc-400 hover:text-zinc-600"
+                                                    )}
+                                                >
+                                                    {m === 'Transferencia' && <Send className="w-3 h-3" />}
+                                                    {m}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {paymentMethod === 'Transferencia' && (
+                                            <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                                <textarea
+                                                    value={transferData}
+                                                    onChange={(e) => setTransferData(e.target.value)}
+                                                    placeholder="Datos de transferencia (Banco, Op, etc.)"
+                                                    className="w-full px-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-[10px] focus:outline-none focus:ring-2 focus:ring-purple-500/30 text-zinc-900 font-bold placeholder:text-zinc-300 transition-all resize-none h-12"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
