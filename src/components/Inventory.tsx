@@ -39,6 +39,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [counts, setCounts] = useState({ all: 0, labor: 0, alerts: 0 });
 
   const fetchCounts = async () => {
@@ -125,6 +126,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
   useEffect(() => {
     if (settings?.company_id) {
       setPage(0);
+      setSelectedIds(new Set());
       fetchInventoryData(searchTerm, activeTab, sortConfig, 0, false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -184,6 +186,41 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortConfig.field !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-30" />;
     return sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 ml-1" /> : <ArrowDown className="w-3 h-3 ml-1" />;
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === inventoryParts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(inventoryParts.map(p => p.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (window.confirm(`¿Está seguro de que desea eliminar ${selectedIds.size} ítems seleccionados?`)) {
+      try {
+        setIsLoading(true);
+        const { error } = await supabaseGarage.from('romaspa_parts').delete().in('id', Array.from(selectedIds));
+        if (error) throw error;
+        
+        setSelectedIds(new Set());
+        reloadData();
+      } catch (error) {
+        alert('Error al eliminar los repuestos.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   // Skeleton Components
@@ -358,6 +395,14 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                      <table className="w-full text-left border-collapse">
                         <thead>
                            <tr className="bg-zinc-50/80 border-b border-zinc-200 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                               <th className="px-6 py-4 w-10">
+                                 <input 
+                                   type="checkbox" 
+                                   className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                                   checked={selectedIds.size > 0 && selectedIds.size === inventoryParts.length}
+                                   onChange={toggleSelectAll}
+                                 />
+                               </th>
                               <th className="px-6 py-4">ID / Código</th>
                               <th className="px-6 py-4">Nombre</th>
                               <th className="px-6 py-4 text-center">Ubicación</th>
@@ -367,7 +412,7 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                            </tr>
                         </thead>
                         <tbody>
-                           <tr><td colSpan={6} className="p-0"><TableSkeleton /></td></tr>
+                           <tr><td colSpan={7} className="p-0"><TableSkeleton /></td></tr>
                         </tbody>
                      </table>
                   </div>
@@ -385,20 +430,28 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                      inventoryParts.map((part) => (
                        <div key={`mob-${part.id}`} className="p-4 space-y-3">
                          <div className="flex justify-between items-start">
-                           <div className="flex items-center gap-3">
-                             <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
-                               {part.name.toUpperCase().includes('SERVICIO') || part.name.toUpperCase().includes('M.O.') ? <Wrench className="w-4 h-4 text-blue-500" /> : <Package className="w-4 h-4 text-zinc-500" />}
-                             </div>
-                             <div>
-                               <h4 className="font-bold text-zinc-900 leading-tight">{part.name}</h4>
-                               <div className="flex items-center gap-2">
-                                 <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-tighter">ID: {part.id}</span>
-                                 {part.location && (
-                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-zinc-100 text-zinc-600 border border-zinc-200 uppercase">
-                                     <MapPin className="w-2.5 h-2.5" />
-                                     {part.location}
-                                   </span>
-                                 )}
+                           <div className="flex items-start gap-3">
+                             <input 
+                               type="checkbox" 
+                               className="w-5 h-5 mt-1 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                               checked={selectedIds.has(part.id)}
+                               onChange={() => toggleSelect(part.id)}
+                             />
+                             <div className="flex items-center gap-3">
+                               <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center border border-zinc-200">
+                                 {part.name.toUpperCase().includes('SERVICIO') || part.name.toUpperCase().includes('M.O.') ? <Wrench className="w-4 h-4 text-blue-500" /> : <Package className="w-4 h-4 text-zinc-500" />}
+                               </div>
+                               <div>
+                                 <h4 className="font-bold text-zinc-900 leading-tight">{part.name}</h4>
+                                 <div className="flex items-center gap-2">
+                                   <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-tighter">ID: {part.id}</span>
+                                   {part.location && (
+                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-zinc-100 text-zinc-600 border border-zinc-200 uppercase">
+                                       <MapPin className="w-2.5 h-2.5" />
+                                       {part.location}
+                                     </span>
+                                   )}
+                                 </div>
                                </div>
                              </div>
                            </div>
@@ -448,33 +501,52 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
                    <table className="w-full text-left border-collapse">
                      <thead>
                        <tr className="bg-zinc-50/80 border-b border-zinc-200 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                         <th className="px-6 py-4 cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('id')}>
-                           <div className="flex items-center">ID / Código <SortIcon field="id" /></div>
-                         </th>
-                         <th className="px-6 py-4 cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('name')}>
-                           <div className="flex items-center">Nombre <SortIcon field="name" /></div>
-                         </th>
-                         <th className="px-6 py-4 text-center">Ubicación</th>
-                         <th className="px-6 py-4 text-right cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('stock')}>
-                           <div className="flex items-center justify-end">Stock <SortIcon field="stock" /></div>
-                         </th>
-                         <th className="px-6 py-4 text-right cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('price')}>
-                           <div className="flex items-center justify-end">Precio Unit. <SortIcon field="price" /></div>
-                         </th>
-                         <th className="px-1 py-4 text-center">Acciones</th>
-                       </tr>
+                          <th className="px-6 py-4 bg-zinc-100/50">
+                            <input 
+                              type="checkbox" 
+                              className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                              checked={selectedIds.size > 0 && selectedIds.size === inventoryParts.length}
+                              onChange={toggleSelectAll}
+                            />
+                          </th>
+                          <th className="px-6 py-4 cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('id')}>
+                            <div className="flex items-center">ID / Código <SortIcon field="id" /></div>
+                          </th>
+                          <th className="px-6 py-4 cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('name')}>
+                            <div className="flex items-center">Nombre <SortIcon field="name" /></div>
+                          </th>
+                          <th className="px-6 py-4 text-center">Ubicación</th>
+                          <th className="px-6 py-4 text-right cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('stock')}>
+                            <div className="flex items-center justify-end">Stock <SortIcon field="stock" /></div>
+                          </th>
+                          <th className="px-6 py-4 text-right cursor-pointer hover:bg-zinc-100 transition-colors" onClick={() => handleSort('price')}>
+                            <div className="flex items-center justify-end">Precio Unit. <SortIcon field="price" /></div>
+                          </th>
+                          <th className="px-1 py-4 text-center">Acciones</th>
+                        </tr>
                      </thead>
                      <tbody className="divide-y divide-zinc-100">
                        {inventoryParts.length === 0 ? (
                          <tr>
-                           <td colSpan={6} className="px-6 py-12 text-center">
+                           <td colSpan={7} className="px-6 py-12 text-center">
                              <Package className="w-12 h-12 text-zinc-200 mx-auto mb-3" />
                              <p className="text-zinc-500 font-medium">No se encontraron ítems.</p>
                            </td>
                          </tr>
                        ) : (
                          inventoryParts.map((part) => (
-                           <tr key={`desk-${part.id}`} className="hover:bg-zinc-50/50 transition-colors group">
+                           <tr key={`desk-${part.id}`} className={cn(
+                             "hover:bg-zinc-50/50 transition-colors group",
+                             selectedIds.has(part.id) && "bg-emerald-50/50"
+                           )}>
+                             <td className="px-6 py-4">
+                               <input 
+                                 type="checkbox" 
+                                 className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                                 checked={selectedIds.has(part.id)}
+                                 onChange={() => toggleSelect(part.id)}
+                               />
+                             </td>
                              <td className="px-6 py-4">
                                <span className="font-mono text-[10px] font-bold text-zinc-500 bg-zinc-100 px-2 py-1 rounded-md border border-zinc-200">
                                  {part.id}
@@ -657,6 +729,34 @@ export function Inventory({ parts, settings, onAddPart, onUpdatePart, onDeletePa
         part={selectedPart}
         onUpdate={handleUpdateWrapper}
       />
+
+      {/* Floating Bulk Actions Bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-10 duration-500">
+           <div className="flex items-center gap-4 px-6 py-4 bg-zinc-900 text-white rounded-2xl shadow-2xl border border-zinc-700/50 backdrop-blur-xl">
+              <div className="flex flex-col">
+                 <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">Seleccionados</span>
+                 <span className="text-lg font-black leading-none">{selectedIds.size} ítems</span>
+              </div>
+              <div className="h-8 w-px bg-zinc-700/50 mx-2" />
+              <div className="flex items-center gap-2">
+                 <button
+                    onClick={() => setSelectedIds(new Set())}
+                    className="px-4 py-2 text-xs font-bold text-zinc-400 hover:text-white transition-colors"
+                 >
+                    Cancelar
+                 </button>
+                 <button
+                    onClick={handleBulkDelete}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl transition-all shadow-lg active:scale-95"
+                 >
+                    <Trash2 className="w-4 h-4" />
+                    ELIMINAR SELECCIÓN
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -319,9 +319,9 @@ export function KanbanBoard({
 
       {/* ── Toolbar: Zoom + Monitor Toggle ───────────────────── */}
       <div className={cn(
-        "flex flex-wrap items-center justify-between gap-2 mb-2 flex-shrink-0 px-1",
+        "flex items-center justify-between gap-2 mb-2 flex-shrink-0 px-1",
         isMonitorMode && "fixed bottom-6 left-6 z-50 mb-0 px-0 bg-white/90 backdrop-blur-md p-2 rounded-2xl border border-zinc-200 shadow-2xl opacity-40 hover:opacity-100 transition-all duration-300 scale-90",
-        !isMonitorMode && "sm:flex hidden"
+        !isMonitorMode && "flex"
       )}>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-1 bg-zinc-100 p-0.5 rounded-lg border border-zinc-200">
@@ -348,7 +348,10 @@ export function KanbanBoard({
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-auto relative scrollbar-hide snap-x snap-mandatory lg:snap-none">
+      <div className={cn(
+        "flex-1 overflow-x-auto relative scrollbar-hide",
+        zoomLevel === 1 && "snap-x snap-mandatory lg:snap-none"
+      )}>
         <div
           className={cn(
             "h-full min-w-max transition-transform duration-300 ease-out origin-top-left",

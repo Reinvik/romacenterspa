@@ -192,16 +192,16 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
     };
 
     return (
-        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 md:p-4 font-sans overflow-hidden">
+        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-0 md:p-4 font-sans overflow-hidden">
             <div className={cn(
-                "bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row transition-all duration-500 ease-out max-h-[96vh] w-full",
+                "bg-white rounded-none md:rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row transition-all duration-500 ease-out h-full md:max-h-[96vh] w-full",
                 showHistory ? "max-w-6xl" : "max-w-2xl"
             )}>
 
                 {/* Panel Principal de Edición */}
                 <div className="flex-1 flex flex-col overflow-hidden border-r border-zinc-100">
                     {/* Header */}
-                    <div className="flex justify-between items-start p-6 border-b border-zinc-50 shrink-0 bg-zinc-50/30">
+                    <div className="flex justify-between items-start p-4 md:p-6 border-b border-zinc-50 shrink-0 bg-zinc-50/30">
                         <div className="flex flex-col">
                             <button
                                 onClick={() => setShowHistory(!showHistory)}
@@ -226,7 +226,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                     </div>
 
                     {/* Formulario */}
-                    <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-8 overflow-y-auto flex-1 scrollbar-thin">
+                    <form onSubmit={handleSubmit} className="p-4 md:p-8 space-y-6 md:space-y-8 overflow-y-auto flex-1 scrollbar-thin">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                             {/* Ficha Técnica */}
                             <div className="space-y-5">
@@ -590,7 +590,7 @@ export function EditTicketModal({ isOpen, onClose, ticket, mechanics, parts, onU
                     showHistory ? "w-full md:w-[450px] opacity-100" : "w-0 opacity-0"
                 )}>
                     {showHistory && (
-                        <div className="flex-1 flex flex-col p-6 h-full overflow-hidden animate-in slide-in-from-right-10 duration-500">
+                        <div className="flex-1 flex flex-col p-4 md:p-6 h-full overflow-hidden animate-in slide-in-from-right-10 duration-500">
                             <div className="flex items-center justify-between mb-6">
                                 <h3 className="text-sm font-black text-zinc-900 flex items-center gap-2">
                                     <History className="w-4 h-4 text-purple-600" />
