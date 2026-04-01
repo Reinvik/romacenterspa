@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Part } from '../types';
-import { X, Save, Package, Hash, DollarSign, Activity, Loader2 } from 'lucide-react';
+import { X, Save, Package, Hash, DollarSign, Activity, Loader2, Plus, Minus } from 'lucide-react';
 
 interface EditPartModalProps {
     isOpen: boolean;
@@ -97,26 +97,58 @@ export function EditPartModal({ isOpen, onClose, part, onUpdate }: EditPartModal
                                 <Hash className="w-4 h-4 text-zinc-400" />
                                 Stock Actual
                             </label>
-                            <input
-                                required
-                                type="number"
-                                className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-zinc-800 font-sans"
-                                value={formData.stock}
-                                onChange={e => setFormData({ ...formData, stock: parseInt(e.target.value) })}
-                            />
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, stock: Math.max(0, prev.stock - 1) }))}
+                                    className="p-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-xl transition-colors border border-zinc-200"
+                                >
+                                    <Minus className="w-4 h-4" />
+                                </button>
+                                <input
+                                    required
+                                    type="number"
+                                    className="w-full px-2 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-zinc-800 font-sans text-center"
+                                    value={formData.stock}
+                                    onChange={e => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, stock: prev.stock + 1 }))}
+                                    className="p-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-xl transition-colors border border-zinc-200"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-semibold text-zinc-700 flex items-center gap-2">
                                 <Activity className="w-4 h-4 text-zinc-400" />
                                 Stock Mínimo
                             </label>
-                            <input
-                                required
-                                type="number"
-                                className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-zinc-800 font-sans"
-                                value={formData.min_stock}
-                                onChange={e => setFormData({ ...formData, min_stock: parseInt(e.target.value) })}
-                            />
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, min_stock: Math.max(0, prev.min_stock - 1) }))}
+                                    className="p-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-xl transition-colors border border-zinc-200"
+                                >
+                                    <Minus className="w-4 h-4" />
+                                </button>
+                                <input
+                                    required
+                                    type="number"
+                                    className="w-full px-2 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-zinc-800 font-sans text-center"
+                                    value={formData.min_stock}
+                                    onChange={e => setFormData({ ...formData, min_stock: parseInt(e.target.value) || 0 })}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, min_stock: prev.min_stock + 1 }))}
+                                    className="p-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-xl transition-colors border border-zinc-200"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -125,13 +157,29 @@ export function EditPartModal({ isOpen, onClose, part, onUpdate }: EditPartModal
                             <DollarSign className="w-4 h-4 text-zinc-400" />
                             Precio Unitario
                         </label>
-                        <input
-                            required
-                            type="number"
-                            className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-zinc-800 font-sans font-bold"
-                            value={formData.price}
-                            onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) })}
-                        />
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, price: Math.max(0, prev.price - 1000) }))}
+                                className="flex items-center gap-1 px-3 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-xl transition-colors border border-zinc-200 font-bold text-xs"
+                            >
+                                <Minus className="w-3 h-3" /> $1k
+                            </button>
+                            <input
+                                required
+                                type="number"
+                                className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all text-zinc-800 font-sans font-bold text-center"
+                                value={formData.price}
+                                onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, price: prev.price + 1000 }))}
+                                className="flex items-center gap-1 px-3 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-xl transition-colors border border-zinc-200 font-bold text-xs"
+                            >
+                                <Plus className="w-3 h-3" /> $1k
+                            </button>
+                        </div>
                     </div>
 
                     <div className="space-y-2">
