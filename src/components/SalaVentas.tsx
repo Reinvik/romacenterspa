@@ -491,7 +491,7 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
             <span className="text-xs font-black text-emerald-400">{filteredHistory.length} ventas</span>
           </div>
 
-          <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
+          <div className="overflow-y-auto dark-scrollbar" style={{ maxHeight: '520px' }}>
             {filteredHistory.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-zinc-600 gap-3">
                 <Receipt className="w-10 h-10 opacity-30" />

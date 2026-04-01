@@ -5,3 +5,36 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
+
+/* Estilos de Scrollbar Personalizados */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.3); /* Color sutil */
+    border-radius: 20px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.2s;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(16, 185, 129, 0.6); /* Color verde esmeralda al pasar el mouse */
+  }
+
+  /* Scrollbar para áreas oscuras (sidebar) */
+  .dark-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(16, 185, 129, 0.8);
+  }
+}

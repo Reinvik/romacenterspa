@@ -113,7 +113,7 @@ export function Layout({
           </button>
         </div>
 
-        <nav className="flex-1 py-6 px-3 flex flex-col gap-1 overflow-y-auto">
+        <nav className="flex-1 py-6 px-3 flex flex-col gap-1 overflow-y-auto dark-scrollbar">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
