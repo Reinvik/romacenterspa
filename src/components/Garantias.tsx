@@ -23,6 +23,10 @@ export function Garantias({ garantias, onAdd, onUpdate, onDelete, settings }: Ga
     (g.nombre && g.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  const sortedGarantias = [...filteredGarantias].sort((a, b) => 
+    new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
+  );
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CL', {
       style: 'currency',
@@ -85,10 +89,14 @@ export function Garantias({ garantias, onAdd, onUpdate, onDelete, settings }: Ga
                   </td>
                 </tr>
               ) : (
-                filteredGarantias.map((garantia) => (
+                sortedGarantias.map((garantia) => (
                   <tr key={garantia.id} className="hover:bg-zinc-50/50 transition-colors">
                     <td className="px-4 py-3 whitespace-nowrap text-zinc-600">
-                      {format(new Date(garantia.fecha), "dd 'de' MMMM, yyyy", { locale: es })}
+                      {(() => {
+                        // Evitar problemas de zona horaria interpretando YYYY-MM-DD como local
+                        const [year, month, day] = garantia.fecha.split('-').map(Number);
+                        return format(new Date(year, month - 1, day), "dd 'de' MMMM, yyyy", { locale: es });
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-mono bg-zinc-100 px-2 py-1 rounded text-zinc-700 font-medium">

@@ -28,7 +28,7 @@ export function AddGarantiaModal({ isOpen, onClose, onAdd, onUpdate, initialData
       if (initialData) {
         setFormData({
           ...initialData,
-          fecha: initialData.fecha ? format(new Date(initialData.fecha), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
+          fecha: initialData.fecha || format(new Date(), 'yyyy-MM-dd')
         });
       } else {
         setFormData({
