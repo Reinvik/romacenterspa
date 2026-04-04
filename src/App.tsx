@@ -75,7 +75,7 @@ export default function App() {
     searchTicketsHistory,
     fetchCompanies, addIntelligentReminder, fetchActiveReminder, fetchPublicSettingsBySlug, fetchOccupiedReminders, fetchPublicVehicleInfo,
     addReminder, deleteReminder, updateReminder, refreshData, uploadTicketPhoto,
-    salaVentas, addSalaVenta, fetchSalaVentas,
+    salaVentas, addSalaVenta, fetchSalaVentas, deleteSalaVenta,
     saveCustomerFeedback, garantias, addGarantia, updateGarantia, deleteGarantia
   } = useGarageStore(profile?.company_id);
 
@@ -296,9 +296,11 @@ export default function App() {
           parts={parts}
           tickets={tickets}
           onAddSalaVenta={addSalaVenta}
+          onDeleteSalaVenta={deleteSalaVenta}
           fetchSalaVentas={fetchSalaVentas}
           salaVentas={salaVentas}
           settings={settings}
+          isSuperAdmin={isSuperAdmin}
         />
       )}
 

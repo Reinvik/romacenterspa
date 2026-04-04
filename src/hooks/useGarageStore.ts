@@ -1084,6 +1084,53 @@ export function useGarageStore(companyId?: string) {
     }
   }, [companyId, parts, fetchSalaVentas, fetchData]);
 
+  const deleteSalaVenta = useCallback(async (saleId: string) => {
+    if (!companyId) return;
+    try {
+      // 1. Get the sale record to know what to restore
+      const { data: sale, error: fetchError } = await supabaseGarage
+        .from('romaspa_sala_ventas')
+        .select('*')
+        .eq('id', saleId)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      if (!sale) return;
+
+      const items = (sale.items || []) as SalaVentaItem[];
+
+      // 2. Restore stock for each item
+      for (const item of items) {
+        const { data: part, error: partError } = await supabaseGarage
+          .from('romaspa_parts')
+          .select('stock')
+          .eq('id', item.part_id)
+          .single();
+        
+        if (!partError && part) {
+          const newStock = part.stock + item.cantidad;
+          await supabaseGarage.from('romaspa_parts')
+            .update({ stock: newStock })
+            .eq('id', item.part_id);
+        }
+      }
+
+      // 3. Delete the sale
+      const { error: deleteError } = await supabaseGarage
+        .from('romaspa_sala_ventas')
+        .delete()
+        .eq('id', saleId);
+      
+      if (deleteError) throw deleteError;
+
+      // 4. Refresh data
+      await Promise.all([fetchSalaVentas(), fetchData(true)]);
+    } catch (error) {
+      console.error('Error deleting sala venta:', error);
+      throw error;
+    }
+  }, [companyId, fetchSalaVentas, fetchData]);
+
   /**
    * Guarda el feedback del cliente (rating 1-5 + comentario) en Supabase.
    * No requiere autenticación: el cliente accede vía link público.
@@ -1151,6 +1198,7 @@ export function useGarageStore(companyId?: string) {
     fetchPublicVehicleInfo,
     fetchSalaVentas,
     addSalaVenta,
+    deleteSalaVenta,
     saveCustomerFeedback,
     // ─── Garantías ──────────────────────────────────────────────────
     garantias,

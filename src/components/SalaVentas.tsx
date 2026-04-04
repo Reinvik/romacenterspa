@@ -9,6 +9,7 @@ import { format, parseISO, subDays, startOfDay, endOfDay, isWithinInterval } fro
 import { es } from 'date-fns/locale';
 import { Part, SalaVenta, SalaVentaItem, GarageSettings, PaymentMethod, Ticket, DocumentType } from '../types';
 import { cn } from '../lib/utils';
+import { AdminVerificationModal } from './AdminVerificationModal';
 
 interface SalaVentasProps {
   parts: Part[];
@@ -17,6 +18,8 @@ interface SalaVentasProps {
   fetchSalaVentas: (days?: number) => Promise<SalaVenta[]>;
   salaVentas: SalaVenta[];
   settings: GarageSettings | null;
+  onDeleteSalaVenta?: (id: string) => Promise<void>;
+  isSuperAdmin?: boolean;
 }
 
 interface CartItem {
@@ -24,7 +27,16 @@ interface CartItem {
   cantidad: number;
 }
 
-export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, salaVentas, settings }: SalaVentasProps) {
+export function SalaVentas({ 
+  parts, 
+  tickets, 
+  onAddSalaVenta, 
+  fetchSalaVentas, 
+  salaVentas, 
+  settings, 
+  onDeleteSalaVenta, 
+  isSuperAdmin 
+}: SalaVentasProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
   const [notes, setNotes] = useState('');
@@ -36,6 +48,9 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
   const [rutEmpresa, setRutEmpresa] = useState('');
   const [razonSocial, setRazonSocial] = useState('');
   const [transferData, setTransferData] = useState('');
+  const [isVerifyingModalOpen, setIsVerifyingModalOpen] = useState(false);
+  const [saleToDelete, setSaleToDelete] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchSalaVentas(30);
@@ -573,6 +588,20 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
                             Boleta
                           </div>
                         )}
+
+                        {/* Botón de Eliminar para Superadmin */}
+                        {item.type === 'venta' && onDeleteSalaVenta && (
+                          <button
+                            onClick={() => {
+                              setSaleToDelete(item.id);
+                              setIsVerifyingModalOpen(true);
+                            }}
+                            className="mt-2 p-1.5 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                            title="Eliminar venta"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -580,6 +609,28 @@ export function SalaVentas({ parts, tickets, onAddSalaVenta, fetchSalaVentas, sa
               </div>
             )}
           </div>
+
+          <AdminVerificationModal
+            isOpen={isVerifyingModalOpen}
+            onClose={() => {
+              setIsVerifyingModalOpen(false);
+              setSaleToDelete(null);
+            }}
+            onVerified={async () => {
+              if (saleToDelete && onDeleteSalaVenta) {
+                try {
+                  setLoading(true);
+                  await onDeleteSalaVenta(saleToDelete);
+                  setSaleToDelete(null);
+                  setIsVerifyingModalOpen(false);
+                } catch (error) {
+                  alert('Error al eliminar la venta.');
+                } finally {
+                  setLoading(false);
+                }
+              }
+            }}
+          />
 
           <div className="p-6 border-t border-zinc-800 bg-zinc-950/50 space-y-3">
             <div className="flex items-center justify-between border-b border-zinc-800/50 pb-3">
