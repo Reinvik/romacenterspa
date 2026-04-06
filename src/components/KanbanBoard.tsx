@@ -34,6 +34,7 @@ import { VehicleCRMModal } from './VehicleCRMModal';
 import { KanbanReminderCard } from './KanbanReminderCard';
 import { GarageSettings } from '../types';
 import { FinishTicketModal } from './FinishTicketModal';
+import { AdminVerificationModal } from './AdminVerificationModal';
 
 interface KanbanBoardProps {
   tickets: Ticket[];
@@ -146,6 +147,7 @@ export function KanbanBoard({
 
   const [softLockPending, setSoftLockPending] = useState<{id: string, status: TicketStatus, mechanic: string} | null>(null);
   const [finishConfirmPending, setFinishConfirmPending] = useState<{id: string, action: string} | null>(null);
+  const [backwardMovePending, setBackwardMovePending] = useState<{id: string, status: TicketStatus, action: string} | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -207,6 +209,12 @@ export function KanbanBoard({
       if (ticket && selectedMechanic && ticket.mechanic !== selectedMechanic && ticket.mechanic !== 'Sin asignar') {
         setSoftLockPending({ id, status: targetStatus, mechanic: ticket.mechanic });
       } else {
+        // CHECK: If ticket was FINISHED and moving BACKWARDS
+        if (ticket && ticket.status === 'Finalizado' && targetStatus !== 'Finalizado') {
+          setBackwardMovePending({ id, status: targetStatus, action: userAction });
+          setDraggedTicketId(null);
+          return;
+        }
         onUpdateStatus(id, targetStatus, userAction);
       }
     }
@@ -606,6 +614,19 @@ export function KanbanBoard({
           }
         }}
         onCancel={() => setDeleteConfirmTicket(null)}
+      />
+
+      <AdminVerificationModal
+        isOpen={!!backwardMovePending}
+        title="Autorización Requerida"
+        message="Para devolver un ticket finalizado a un estado anterior se requiere la contraseña del usuario molivares."
+        onVerified={() => {
+          if (backwardMovePending) {
+            onUpdateStatus(backwardMovePending.id, backwardMovePending.status, backwardMovePending.action);
+            setBackwardMovePending(null);
+          }
+        }}
+        onClose={() => setBackwardMovePending(null)}
       />
     </div>
   );

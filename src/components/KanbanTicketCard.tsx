@@ -66,7 +66,7 @@ export function KanbanTicketCard({ ticket, settings, selectedMechanic, isDragged
 
   return (
     <div
-      draggable={ticket.status !== 'Finalizado'}
+      draggable={true}
       onDragStart={(e) => onDragStart(e, ticket.id)}
       onClick={() => onEdit(ticket)}
       className={cn(

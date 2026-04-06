@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   ShoppingCart, Search, Plus, Minus, Trash2, CheckCircle,
   Package, Receipt, TrendingUp, X, ChevronRight, Clock,
-  BarChart3, ShoppingBag
+  BarChart3, ShoppingBag, RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO, subDays, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
@@ -19,6 +19,7 @@ interface SalaVentasProps {
   salaVentas: SalaVenta[];
   settings: GarageSettings | null;
   onDeleteSalaVenta?: (id: string) => Promise<void>;
+  onUpdateSalaVenta?: (id: string, updates: Partial<SalaVenta>) => Promise<void>;
   isSuperAdmin?: boolean;
 }
 
@@ -35,6 +36,7 @@ export function SalaVentas({
   salaVentas, 
   settings, 
   onDeleteSalaVenta, 
+  onUpdateSalaVenta,
   isSuperAdmin 
 }: SalaVentasProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -50,6 +52,8 @@ export function SalaVentas({
   const [transferData, setTransferData] = useState('');
   const [isVerifyingModalOpen, setIsVerifyingModalOpen] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState<string | null>(null);
+  const [verificationType, setVerificationType] = useState<'delete' | 'refund'>('refund');
+  const [refundAmount, setRefundAmount] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -579,8 +583,22 @@ export function SalaVentas({
                           </div>
                         )}
                         {item.document_type === 'Factura' && (
-                          <div className="text-[9px] font-black uppercase tracking-tighter mt-1 px-2 py-0.5 rounded-md border bg-red-500/10 text-red-500 border-red-500/20">
-                            Factura
+                          <div className="flex flex-col items-end gap-1.5 mt-1">
+                            <div className="text-[9px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-md border bg-red-500/10 text-red-500 border-red-500/20">
+                              Factura
+                            </div>
+                            <button
+                              onClick={() => onUpdateSalaVenta?.(item.id, { is_completed_invoice: !item.is_completed_invoice })}
+                              className={cn(
+                                "flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold transition-all border",
+                                item.is_completed_invoice 
+                                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" 
+                                  : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:border-zinc-600"
+                              )}
+                            >
+                              {item.is_completed_invoice ? <CheckCircle className="w-2.5 h-2.5" /> : <div className="w-2.5 h-2.5 rounded-full border border-zinc-600" />}
+                              REALIZADA
+                            </button>
                           </div>
                         )}
                         {item.document_type === 'Boleta' && (
@@ -589,18 +607,33 @@ export function SalaVentas({
                           </div>
                         )}
 
-                        {/* Botón de Eliminar para Superadmin */}
+                        {/* Botones de acción discreta para Superadmin */}
                         {item.type === 'venta' && onDeleteSalaVenta && (
-                          <button
-                            onClick={() => {
-                              setSaleToDelete(item.id);
-                              setIsVerifyingModalOpen(true);
-                            }}
-                            className="mt-2 p-1.5 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                            title="Eliminar venta"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center gap-1 mt-2">
+                            <button
+                              onClick={() => {
+                                setSaleToDelete(item.id);
+                                setVerificationType('refund');
+                                setRefundAmount(item.total.toString()); // Por defecto toda la venta
+                                setIsVerifyingModalOpen(true);
+                              }}
+                              className="p-1.5 text-zinc-600 hover:text-amber-500 hover:bg-amber-500/10 rounded-lg transition-all"
+                              title="Ajuste / Devolución"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSaleToDelete(item.id);
+                                setVerificationType('delete');
+                                setIsVerifyingModalOpen(true);
+                              }}
+                              className="p-1.5 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                              title="Eliminar venta (error de registro)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -612,25 +645,72 @@ export function SalaVentas({
 
           <AdminVerificationModal
             isOpen={isVerifyingModalOpen}
+            title={verificationType === 'refund' ? "Autorizar Ajuste / Devolución" : "Autorizar Eliminación"}
+            message={verificationType === 'refund' 
+              ? "Ingrese el monto que desea devolver. Se registrará como un ajuste negativo en esta venta." 
+              : "Esta acción eliminará permanentemente el registro de la venta."}
             onClose={() => {
               setIsVerifyingModalOpen(false);
               setSaleToDelete(null);
             }}
             onVerified={async () => {
-              if (saleToDelete && onDeleteSalaVenta) {
+              if (saleToDelete) {
                 try {
                   setLoading(true);
-                  await onDeleteSalaVenta(saleToDelete);
+                  if (verificationType === 'refund') {
+                    // Lógica de Ajuste / Gasto en contra
+                    const sale = salaVentas.find(s => s.id === saleToDelete);
+                    if (!sale) throw new Error('Venta no encontrada');
+                    
+                    const amountToRefund = Number(refundAmount);
+                    if (isNaN(amountToRefund) || amountToRefund <= 0) {
+                        alert('Ingrese un monto válido');
+                        return;
+                    }
+
+                    const newTotal = sale.total - amountToRefund;
+                    const logNote = `\n[DEVOLUCIÓN ${format(new Date(), 'dd/MM HH:mm')}: -$${amountToRefund.toLocaleString()}]`;
+                    
+                    if (onUpdateSalaVenta) {
+                      await onUpdateSalaVenta(saleToDelete, {
+                          total: newTotal,
+                          notes: (sale.notes || '') + logNote
+                      });
+                    }
+                  } else if (onDeleteSalaVenta) {
+                    await onDeleteSalaVenta(saleToDelete);
+                  }
+                  
                   setSaleToDelete(null);
                   setIsVerifyingModalOpen(false);
+                  setRefundAmount('');
                 } catch (error) {
-                  alert('Error al eliminar la venta.');
+                  alert(verificationType === 'refund' ? 'Error al procesar el ajuste.' : 'Error al eliminar la venta.');
+                  console.error(error);
                 } finally {
                   setLoading(false);
                 }
               }
             }}
-          />
+          >
+            {verificationType === 'refund' && (
+              <div className="mt-4 px-1">
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1.5">Monto de devolución</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 font-black">$</span>
+                  <input
+                    type="number"
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-8 py-4 text-white outline-none focus:border-emerald-500/50 transition-all font-black text-xl"
+                    placeholder="0"
+                    autoFocus
+                  />
+                </div>
+                <p className="text-[9px] text-zinc-500 mt-2 italic px-1">El stock no se verá afectado Automáticamente.</p>
+              </div>
+            )}
+          </AdminVerificationModal>
 
           <div className="p-6 border-t border-zinc-800 bg-zinc-950/50 space-y-3">
             <div className="flex items-center justify-between border-b border-zinc-800/50 pb-3">

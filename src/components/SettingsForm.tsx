@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GarageSettings } from '../types';
-import { Save, Building2, MapPin, Phone, MessageSquare, Loader2, CheckCircle, Palette, Download, FileSpreadsheet, Lock, Eye, EyeOff, ScrollText, Puzzle, ExternalLink, HelpCircle } from 'lucide-react';
+import { Save, Building2, MapPin, Phone, MessageSquare, Loader2, CheckCircle, Palette, Download, FileSpreadsheet, Lock, Eye, EyeOff, ScrollText, Puzzle, ExternalLink, HelpCircle, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Ticket, Part } from '../types';
 import { cn } from '../lib/utils';
@@ -26,7 +26,8 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
         logo_y_offset: 50,
         theme_menu_text: '#a1a1aa',
         theme_menu_highlight: '#10b981',
-        company_slug: ''
+        company_slug: '',
+        invoice_alert_time: '19:00'
     });
     const [loading, setLoading] = useState(false);
     const [saved, setSaved] = useState(false);
@@ -56,7 +57,8 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                 logo_y_offset: settings.logo_y_offset ?? 50,
                 theme_menu_text: settings.theme_menu_text || '#a1a1aa',
                 theme_menu_highlight: settings.theme_menu_highlight || '#10b981',
-                company_slug: settings.company_slug || ''
+                company_slug: settings.company_slug || '',
+                invoice_alert_time: settings.invoice_alert_time || '19:00'
             });
         }
     }, [settings]);
@@ -244,6 +246,24 @@ export function SettingsForm({ settings, onUpdate, tickets, parts }: SettingsFor
                             value={formData.logo_url}
                             onChange={e => setFormData({ ...formData, logo_url: e.target.value })}
                         />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold text-zinc-700 flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-zinc-400" />
+                            Hora Alerta Facturas Pendientes
+                        </label>
+                        <input
+                            type="time"
+                            className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 outline-none transition-all text-zinc-800 focus:ring-2"
+                            style={{ 
+                                borderColor: formData.theme_menu_highlight && formData.theme_menu_highlight !== '#10b981' ? `${formData.theme_menu_highlight}40` : undefined,
+                                boxShadow: formData.theme_menu_highlight && formData.theme_menu_highlight !== '#10b981' ? `0 0 0 2px ${formData.theme_menu_highlight}20` : undefined
+                            }}
+                            value={formData.invoice_alert_time}
+                            onChange={e => setFormData({ ...formData, invoice_alert_time: e.target.value })}
+                        />
+                        <p className="text-[10px] text-zinc-500 italic">Se notificará una vez al día si quedan facturas sin marcar después de esta hora.</p>
                     </div>
 
                     {/* Controles de Logo */}

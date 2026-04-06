@@ -8,6 +8,7 @@ interface AdminVerificationModalProps {
   onVerified: () => void;
   title?: string;
   message?: string;
+  children?: React.ReactNode;
 }
 
 export function AdminVerificationModal({ 
@@ -15,7 +16,8 @@ export function AdminVerificationModal({
   onClose, 
   onVerified,
   title = "Verificación de Administrador",
-  message = "Esta acción requiere privilegios de superadmin. Por favor ingrese la clave maestra."
+  message = "Esta acción requiere privilegios de superadmin. Por favor ingrese la clave maestra.",
+  children
 }: AdminVerificationModalProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
@@ -30,7 +32,7 @@ export function AdminVerificationModal({
     const MASTER_KEY = 'Nexus123';
 
     setTimeout(() => {
-      if (password === MASTER_KEY || password === 'adminromaspa') {
+      if (password === MASTER_KEY || password === 'adminromaspa' || password === 'romacenter-mo' || password === 'adminmolivares') {
         onVerified();
         setPassword('');
         onClose();
@@ -107,6 +109,8 @@ export function AdminVerificationModal({
                     </div>
                   )}
                 </div>
+                
+                {children}
 
                 <div className="flex gap-3 pt-2">
                   <button

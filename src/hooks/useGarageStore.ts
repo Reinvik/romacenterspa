@@ -1131,6 +1131,23 @@ export function useGarageStore(companyId?: string) {
     }
   }, [companyId, fetchSalaVentas, fetchData]);
 
+  const updateSalaVenta = useCallback(async (saleId: string, updates: Partial<SalaVenta>) => {
+    if (!companyId) return;
+    try {
+      const { error } = await supabaseGarage
+        .from('romaspa_sala_ventas')
+        .update(updates)
+        .eq('id', saleId)
+        .eq('company_id', companyId);
+
+      if (error) throw error;
+      await fetchSalaVentas();
+    } catch (error) {
+      console.error('Error updating sala venta:', error);
+      throw error;
+    }
+  }, [companyId, fetchSalaVentas]);
+
   /**
    * Guarda el feedback del cliente (rating 1-5 + comentario) en Supabase.
    * No requiere autenticación: el cliente accede vía link público.
@@ -1199,6 +1216,7 @@ export function useGarageStore(companyId?: string) {
     fetchSalaVentas,
     addSalaVenta,
     deleteSalaVenta,
+    updateSalaVenta,
     saveCustomerFeedback,
     // ─── Garantías ──────────────────────────────────────────────────
     garantias,

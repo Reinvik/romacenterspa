@@ -24,6 +24,7 @@ import { Sales } from './components/Sales';
 import { SalaVentas } from './components/SalaVentas';
 import { AIConsultant } from './components/AIConsultant';
 import { Garantias } from './components/Garantias';
+import { InvoiceAlertMonitor } from './components/InvoiceAlertMonitor';
 
 type ViewState = 'landing' | 'login' | 'customer' | 'dashboard';
 
@@ -75,7 +76,7 @@ export default function App() {
     searchTicketsHistory,
     fetchCompanies, addIntelligentReminder, fetchActiveReminder, fetchPublicSettingsBySlug, fetchOccupiedReminders, fetchPublicVehicleInfo,
     addReminder, deleteReminder, updateReminder, refreshData, uploadTicketPhoto,
-    salaVentas, addSalaVenta, fetchSalaVentas, deleteSalaVenta,
+    salaVentas, addSalaVenta, fetchSalaVentas, deleteSalaVenta, updateSalaVenta,
     saveCustomerFeedback, garantias, addGarantia, updateGarantia, deleteGarantia
   } = useGarageStore(profile?.company_id);
 
@@ -297,6 +298,7 @@ export default function App() {
           tickets={tickets}
           onAddSalaVenta={addSalaVenta}
           onDeleteSalaVenta={deleteSalaVenta}
+          onUpdateSalaVenta={updateSalaVenta}
           fetchSalaVentas={fetchSalaVentas}
           salaVentas={salaVentas}
           settings={settings}
@@ -421,6 +423,7 @@ export default function App() {
         onUpdatePart={updatePart}
         settings={settings}
       />
+      <InvoiceAlertMonitor salaVentas={salaVentas} settings={settings} />
     </Layout>
   );
 }

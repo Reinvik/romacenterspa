@@ -138,6 +138,8 @@ export interface GarageSettings {
   theme_menu_text?: string;
   theme_menu_highlight?: string;
   company_slug?: string;
+  invoice_alert_time?: string;
+  iva_percentage?: number;
 }
 
 // ─── Sala Ventas (Mostrador / POS) ───────────────────────────────────────────
@@ -163,6 +165,7 @@ export interface SalaVenta {
   rut_empresa?: string;
   razon_social?: string;
   transfer_data?: string;
+  is_completed_invoice?: boolean;
 }
 
 export interface Profile {
