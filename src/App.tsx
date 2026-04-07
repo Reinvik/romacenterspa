@@ -26,6 +26,8 @@ import { AIConsultant } from './components/AIConsultant';
 import { Garantias } from './components/Garantias';
 import { InvoiceAlertMonitor } from './components/InvoiceAlertMonitor';
 
+import { AppUpdateNotifier } from './components/AppUpdateNotifier';
+
 type ViewState = 'landing' | 'login' | 'customer' | 'dashboard';
 
 export default function App() {
@@ -299,6 +301,7 @@ export default function App() {
           onAddSalaVenta={addSalaVenta}
           onDeleteSalaVenta={deleteSalaVenta}
           onUpdateSalaVenta={updateSalaVenta}
+          onUpdateTicket={updateTicket}
           fetchSalaVentas={fetchSalaVentas}
           salaVentas={salaVentas}
           settings={settings}
@@ -424,6 +427,7 @@ export default function App() {
         settings={settings}
       />
       <InvoiceAlertMonitor salaVentas={salaVentas} settings={settings} />
+      <AppUpdateNotifier />
     </Layout>
   );
 }

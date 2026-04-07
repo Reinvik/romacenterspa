@@ -249,7 +249,7 @@ export function useGarageStore(companyId?: string) {
     }
   }, [companyId, fetchData]);
 
-  const updateTicketStatus = useCallback(async (ticketId: string, status: TicketStatus, changedBy: string = 'Recepción/Admin', paymentMethod?: PaymentMethod, documentType?: DocumentType, rutEmpresa?: string, razonSocial?: string, transferData?: string) => {
+  const updateTicketStatus = useCallback(async (ticketId: string, status: TicketStatus, changedBy: string = 'Recepción/Admin', paymentMethod?: PaymentMethod, documentType?: DocumentType, rutEmpresa?: string, razonSocial?: string, transferData?: string, emailEmpresa?: string) => {
     const now = new Date().toISOString();
     let originalTicket: Ticket | undefined;
 
@@ -277,6 +277,7 @@ export function useGarageStore(companyId?: string) {
           document_type: documentType,
           rut_empresa: rutEmpresa || null,
           razon_social: razonSocial || null,
+          email_empresa: emailEmpresa || null,
           transfer_data: transferData || null
         })
         .eq('id', ticketId);
@@ -497,6 +498,8 @@ export function useGarageStore(companyId?: string) {
       if (updates.rut_empresa !== undefined) dbUpdates.rut_empresa = updates.rut_empresa;
       if (updates.razon_social !== undefined) dbUpdates.razon_social = updates.razon_social;
       if (updates.transfer_data !== undefined) dbUpdates.transfer_data = updates.transfer_data;
+      if (updates.email_empresa !== undefined) dbUpdates.email_empresa = updates.email_empresa;
+      if (updates.is_completed_invoice !== undefined) dbUpdates.is_completed_invoice = updates.is_completed_invoice;
 
       if (updates.mechanic_id !== undefined) {
         dbUpdates.mechanic = updates.mechanic_id === 'Sin asignar' ? null : updates.mechanic_id;
@@ -1046,7 +1049,7 @@ export function useGarageStore(companyId?: string) {
     }
   }, [companyId]);
 
-  const addSalaVenta = useCallback(async (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, rutEmpresa?: string, razonSocial?: string, notes?: string, transferData?: string) => {
+  const addSalaVenta = useCallback(async (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, rutEmpresa?: string, razonSocial?: string, notes?: string, transferData?: string, emailEmpresa?: string) => {
     if (!companyId) return;
     const total = items.reduce((acc, i) => acc + i.subtotal, 0);
     try {
@@ -1059,6 +1062,7 @@ export function useGarageStore(companyId?: string) {
         document_type: documentType,
         rut_empresa: rutEmpresa || null,
         razon_social: razonSocial || null,
+        email_empresa: emailEmpresa || null,
         notes: notes || null,
         transfer_data: transferData || null,
         sold_at: new Date().toISOString()

@@ -14,12 +14,13 @@ import { AdminVerificationModal } from './AdminVerificationModal';
 interface SalaVentasProps {
   parts: Part[];
   tickets: Ticket[];
-  onAddSalaVenta: (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, rutEmpresa?: string, razonSocial?: string, notes?: string, transferData?: string) => Promise<void>;
+  onAddSalaVenta: (items: SalaVentaItem[], paymentMethod: PaymentMethod, documentType: DocumentType, rutEmpresa?: string, razonSocial?: string, notes?: string, transferData?: string, emailEmpresa?: string) => Promise<void>;
   fetchSalaVentas: (days?: number) => Promise<SalaVenta[]>;
   salaVentas: SalaVenta[];
   settings: GarageSettings | null;
   onDeleteSalaVenta?: (id: string) => Promise<void>;
   onUpdateSalaVenta?: (id: string, updates: Partial<SalaVenta>) => Promise<void>;
+  onUpdateTicket?: (id: string, updates: Partial<Ticket>) => Promise<void>;
   isSuperAdmin?: boolean;
 }
 
@@ -37,6 +38,7 @@ export function SalaVentas({
   settings, 
   onDeleteSalaVenta, 
   onUpdateSalaVenta,
+  onUpdateTicket,
   isSuperAdmin 
 }: SalaVentasProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -49,6 +51,7 @@ export function SalaVentas({
   const [documentType, setDocumentType] = useState<DocumentType>('Boleta');
   const [rutEmpresa, setRutEmpresa] = useState('');
   const [razonSocial, setRazonSocial] = useState('');
+  const [emailEmpresa, setEmailEmpresa] = useState('');
   const [transferData, setTransferData] = useState('');
   const [isVerifyingModalOpen, setIsVerifyingModalOpen] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState<string | null>(null);
@@ -99,6 +102,21 @@ export function SalaVentas({
   // ─── Confirmar venta ──────────────────────────────────────────────────────
   const handleConfirm = async () => {
     if (cart.length === 0) return;
+    
+    // Validación de Factura (Campos obligatorios)
+    if (documentType === 'Factura') {
+      if (!rutEmpresa.trim() || !razonSocial.trim() || !emailEmpresa.trim()) {
+        alert('Para Facturas, el RUT, la Razón Social y el Email son obligatorios.');
+        return;
+      }
+      
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailEmpresa)) {
+        alert('Por favor ingrese un email válido.');
+        return;
+      }
+    }
+
     setConfirming(true);
     try {
       const items: SalaVentaItem[] = cart.map(c => ({
@@ -108,11 +126,12 @@ export function SalaVentas({
         precio_unitario: c.part.price,
         subtotal: c.part.price * c.cantidad
       }));
-      await onAddSalaVenta(items, paymentMethod, documentType, rutEmpresa || undefined, razonSocial || undefined, notes || undefined, transferData || undefined);
+      await onAddSalaVenta(items, paymentMethod, documentType, rutEmpresa || undefined, razonSocial || undefined, notes || undefined, transferData || undefined, emailEmpresa || undefined);
       setCart([]);
       setNotes('');
       setRutEmpresa('');
       setRazonSocial('');
+      setEmailEmpresa('');
       setTransferData('');
       setSuccessMsg(`✅ Venta de $${cartTotal.toLocaleString()} registrada`);
       setTimeout(() => setSuccessMsg(''), 3500);
@@ -208,9 +227,8 @@ export function SalaVentas({
       const d = safeParseDate(item.date);
       
       if (timeRange === 'facturas') {
-        const dayStr = format(d, 'yyyy-MM-dd');
-        const todayStr = format(now, 'yyyy-MM-dd');
-        return dayStr === todayStr && item.document_type === 'Factura';
+        const thirtyDaysAgo = subDays(now, 30);
+        return d >= thirtyDaysAgo && item.document_type === 'Factura';
       }
 
       if (timeRange === 'today') {
@@ -264,7 +282,7 @@ export function SalaVentas({
                   : "bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50"
               )}
             >
-              {r === 'facturas' ? 'Facturas hoy' : { today: 'Hoy', '7d': '7 Días', '30d': '30 Días' }[r]}
+              {r === 'facturas' ? 'Facturas 30D' : { today: 'Hoy', '7d': '7 Días', '30d': '30 Días' }[r]}
             </button>
           ))}
         </div>
@@ -479,6 +497,16 @@ export function SalaVentas({
                       className="w-full text-sm px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 uppercase"
                     />
                   </div>
+                  <div className="space-y-1.5 col-span-2">
+                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest pl-1">Email Empresa</label>
+                    <input
+                      type="email"
+                      value={emailEmpresa}
+                      onChange={e => setEmailEmpresa(e.target.value)}
+                      placeholder="empresa@ejemplo.com"
+                      className="w-full text-sm px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -588,15 +616,25 @@ export function SalaVentas({
                               Factura
                             </div>
                             <button
-                              onClick={() => onUpdateSalaVenta?.(item.id, { is_completed_invoice: !item.is_completed_invoice })}
+                              onClick={async () => {
+                                const isCompleted = item.type === 'venta' ? item.is_completed_invoice : item.ticketData?.is_completed_invoice;
+                                if (item.type === 'venta') {
+                                  await onUpdateSalaVenta?.(item.id, { is_completed_invoice: !isCompleted });
+                                } else if (item.type === 'ticket') {
+                                  await onUpdateTicket?.(item.id, { is_completed_invoice: !isCompleted });
+                                }
+                              }}
                               className={cn(
-                                "flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold transition-all border",
-                                item.is_completed_invoice 
-                                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" 
-                                  : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:border-zinc-600"
+                                "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black transition-all border duration-300 active:scale-90",
+                                (item.type === 'venta' ? item.is_completed_invoice : item.ticketData?.is_completed_invoice)
+                                  ? "bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-500/40 ring-2 ring-emerald-500/20" 
+                                  : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:border-zinc-500 hover:text-zinc-300"
                               )}
                             >
-                              {item.is_completed_invoice ? <CheckCircle className="w-2.5 h-2.5" /> : <div className="w-2.5 h-2.5 rounded-full border border-zinc-600" />}
+                              {(item.type === 'venta' ? item.is_completed_invoice : item.ticketData?.is_completed_invoice) 
+                                ? <CheckCircle className="w-3 h-3 text-white" /> 
+                                : <div className="w-3 h-3 rounded-md border-2 border-zinc-600 transition-colors group-hover:border-zinc-400" />
+                              }
                               REALIZADA
                             </button>
                           </div>

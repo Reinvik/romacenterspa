@@ -70,7 +70,9 @@ export interface Ticket {
   customer_feedback?: string;  // Comentario escrito del cliente
   rut_empresa?: string;
   razon_social?: string;
+  email_empresa?: string;
   transfer_data?: string;
+  is_completed_invoice?: boolean;
 }
 
 export interface Mechanic {
@@ -164,6 +166,7 @@ export interface SalaVenta {
   created_at: string; // ISO string
   rut_empresa?: string;
   razon_social?: string;
+  email_empresa?: string;
   transfer_data?: string;
   is_completed_invoice?: boolean;
 }
